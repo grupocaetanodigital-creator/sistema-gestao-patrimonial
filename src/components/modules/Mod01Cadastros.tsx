@@ -553,12 +553,36 @@ export const Mod01Cadastros: React.FC<Mod01CadastrosProps> = ({
     setModalMorador(false);
   };
 
-  // Filtragem
-  const operadoresDoCondominio = operadores.filter(
-    (o) =>
-      o.nome.toLowerCase().includes(buscaOperador.toLowerCase()) ||
-      o.login.toLowerCase().includes(buscaOperador.toLowerCase())
-  );
+  // Contagem de operadores autorizados neste condomínio
+  const operadoresDoPostoCount = operadores.filter((op) => {
+    const isMaster = op.cargo === 'Desenvolvedor Master' || op.login === 'admin' || op.role === 'master';
+    const isTodos = op.condominiosAutorizados?.includes('TODOS');
+    const isVinculado = op.condominiosAutorizados?.includes(condominioAtivo.id);
+    return isMaster || isTodos || isVinculado;
+  }).length;
+
+  // Filtragem com suporte a filtroPostoOperador e busca textual
+  const operadoresDoCondominio = operadores.filter((o) => {
+    // 1. Filtro por Posto / Condomínio Ativo
+    if (filtroPostoOperador === 'ativo') {
+      const isMaster = o.cargo === 'Desenvolvedor Master' || o.login === 'admin' || o.role === 'master';
+      const isTodos = o.condominiosAutorizados?.includes('TODOS');
+      const isVinculado = o.condominiosAutorizados?.includes(condominioAtivo.id);
+      if (!isMaster && !isTodos && !isVinculado) return false;
+    }
+
+    // 2. Busca por texto
+    if (buscaOperador.trim()) {
+      const q = buscaOperador.toLowerCase();
+      const matchNome = o.nome.toLowerCase().includes(q);
+      const matchLogin = o.login.toLowerCase().includes(q);
+      const matchCargo = o.cargo.toLowerCase().includes(q);
+      const matchCodigo = o.codigo.toLowerCase().includes(q);
+      return matchNome || matchLogin || matchCargo || matchCodigo;
+    }
+
+    return true;
+  });
 
   const moradoresDoCondominio = moradores.filter(
     (m) =>
@@ -1172,7 +1196,7 @@ export const Mod01Cadastros: React.FC<Mod01CadastrosProps> = ({
                     : 'text-slate-400 hover:text-white'
                 }`}
               >
-                Deste Condomínio ({condominioAtivo.nome.split(' ')[0]})
+                Deste Condomínio ({operadoresDoPostoCount})
               </button>
             </div>
           </div>
@@ -1499,6 +1523,7 @@ export const Mod01Cadastros: React.FC<Mod01CadastrosProps> = ({
                 const ocorrenciasC = mockDb.getOcorrencias().filter((o) => o.condominioId === cTarget.id);
                 const passagensC = mockDb.getPassagens().filter((p) => p.condominioId === cTarget.id);
                 const autorizadosC = mockDb.getAutorizados().filter((a) => a.condominioId === cTarget.id);
+                const atividadesC = mockDb.getAtividades().filter((a) => a.condominioId === cTarget.id);
 
                 const headers = [
                   'MODULO',
@@ -1692,6 +1717,21 @@ export const Mod01Cadastros: React.FC<Mod01CadastrosProps> = ({
                   ]);
                 });
 
+                // 13. Histórico de Atividades & Auditoria (Módulo 12)
+                atividadesC.forEach((a) => {
+                  rows.push([
+                    'HISTORICO_ATIVIDADES',
+                    a.categoria.toUpperCase(),
+                    a.id,
+                    a.codigo || '-',
+                    a.acao,
+                    a.nivel.toUpperCase(),
+                    a.dataHora,
+                    a.operadorNome,
+                    `Módulo: ${a.moduloOrigem} | Descrição: ${a.descricao.replace(/[\r\n]+/g, ' ')} | Detalhes: ${(a.detalhes || '-').replace(/[\r\n]+/g, ' ')}`
+                  ]);
+                });
+
                 // Montar CSV com delimitador ; e codificação UTF-8 com BOM
                 const csvFormattedRows = rows.map((r) =>
                   r.map((col) => `"${String(col || '').replace(/"/g, '""')}"`).join(';')
@@ -1749,6 +1789,7 @@ export const Mod01Cadastros: React.FC<Mod01CadastrosProps> = ({
             const passagens = mockDb.getPassagens().filter((p) => p.condominioId === cTarget.id);
             const moradoresCond = moradores.filter((m) => m.condominioId === cTarget.id);
             const autorizados = mockDb.getAutorizados().filter((a) => a.condominioId === cTarget.id);
+            const atividadesCond = mockDb.getAtividades().filter((a) => a.condominioId === cTarget.id);
 
             const modulosBackup = [
               {
@@ -1842,6 +1883,15 @@ export const Mod01Cadastros: React.FC<Mod01CadastrosProps> = ({
                 unidadeQtd: 'autorizados',
                 dados: autorizados,
                 prefixo: 'MOD10_AUTORIZADOS'
+              },
+              {
+                id: 'mod12_historico',
+                nome: 'Módulo 12: Histórico de Atividades & Auditoria',
+                descricao: 'Trilha cronológica de auditoria, eventos operacionais e anotações de guarita',
+                qtd: atividadesCond.length,
+                unidadeQtd: 'atividades',
+                dados: atividadesCond,
+                prefixo: 'MOD12_HISTORICO_ATIVIDADES'
               }
             ];
 

@@ -10,7 +10,8 @@ import {
   AlertTriangle,
   ClipboardList,
   FileSpreadsheet,
-  Settings
+  Settings,
+  History
 } from 'lucide-react';
 import { Condominio, Operador, ItemEncomenda, Chave, ChamadoManutencao } from '../../types';
 
@@ -130,6 +131,14 @@ export const MobileHomeDashboard: React.FC<MobileHomeDashboardProps> = ({
       iconColor: 'text-cyan-400',
       iconBg: 'bg-cyan-500/10 border-cyan-500/20',
       active: Boolean(f?.mod09_passagem)
+    },
+    {
+      id: 'mod12_historico',
+      title: 'Histórico & Auditoria',
+      icon: History,
+      iconColor: 'text-emerald-400',
+      iconBg: 'bg-emerald-500/10 border-emerald-500/20',
+      active: true
     },
     {
       id: 'mod11_relatorios',

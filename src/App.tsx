@@ -22,7 +22,8 @@ import {
   LayoutGrid,
   Volume2,
   VolumeX,
-  Bell
+  Bell,
+  History
 } from 'lucide-react';
 import { audioAlert } from './lib/audioAlert';
 import {
@@ -42,6 +43,7 @@ import {
   Ocorrencia,
   PassagemPosto,
   Autorizado,
+  HistoricoAtividade,
   getCondominiosAutorizados
 } from './types';
 import {
@@ -67,7 +69,7 @@ import { EmergencyModal } from './components/common/EmergencyModal';
 import { MobileMenuDrawer } from './components/common/MobileMenuDrawer';
 import { MobileHomeDashboard } from './components/common/MobileHomeDashboard';
 
-// 11 MÓDULOS MODULARES
+// 12 MÓDULOS MODULARES
 import { Mod01Cadastros } from './components/modules/Mod01Cadastros';
 import { Mod02Encomendas } from './components/modules/Mod02Encomendas';
 import { Mod03Custodia } from './components/modules/Mod03Custodia';
@@ -79,6 +81,7 @@ import { Mod08Ocorrencias } from './components/modules/Mod08Ocorrencias';
 import { Mod09Passagem } from './components/modules/Mod09Passagem';
 import { Mod10Autorizados } from './components/modules/Mod10Autorizados';
 import { Mod11Relatorios } from './components/modules/Mod11Relatorios';
+import { Mod12Historico } from './components/modules/Mod12Historico';
 import { PWAInstallButton } from './components/common/PWAInstallButton';
 
 export default function App() {
@@ -99,6 +102,7 @@ export default function App() {
   const [ocorrencias, setOcorrencias] = useState<Ocorrencia[]>(mockDb.getOcorrencias());
   const [passagens, setPassagens] = useState<PassagemPosto[]>(mockDb.getPassagens());
   const [autorizados, setAutorizados] = useState<Autorizado[]>(mockDb.getAutorizados());
+  const [atividades, setAtividades] = useState<HistoricoAtividade[]>(mockDb.getAtividades());
 
   // Sessão Ativa
   const [operadorAtivo, setOperadorAtivo] = useState<Operador | null>(null);
@@ -143,6 +147,7 @@ export default function App() {
       { id: 'mod08_ocorrencias', active: Boolean(f?.mod08_ocorrencias) },
       { id: 'mod09_passagem', active: Boolean(f?.mod09_passagem) },
       { id: 'mod10_autorizados', active: Boolean(f?.mod10_autorizados) },
+      { id: 'mod12_historico', active: true },
       { id: 'mod11_relatorios', active: true }
     ];
 
@@ -412,6 +417,17 @@ export default function App() {
     const updated = [exec, ...execucoesRonda];
     setExecucoesRonda(updated);
     mockDb.saveExecucoesRonda(updated);
+
+    handleAddAtividade({
+      condominioId: exec.condominioId,
+      categoria: 'ronda',
+      moduloOrigem: 'Módulo 07: Rondas',
+      acao: `Ronda Patrimonial Finalizada (${exec.codigoRonda})`,
+      descricao: `Ronda concluída com ${exec.pontosLidos} de ${exec.totalPontos} pontos conferidos.`,
+      detalhes: exec.anomalias && exec.anomalias.length > 0 ? `Anomalias: ${exec.anomalias.join('; ')}` : 'Sem anomalias registradas.',
+      operadorNome: exec.operadorNome,
+      nivel: exec.anomalias && exec.anomalias.length > 0 ? 'aviso' : 'sucesso'
+    });
   };
 
   // Handlers do Módulo 08 (Ocorrências)
@@ -419,6 +435,17 @@ export default function App() {
     const updated = [oco, ...ocorrencias];
     setOcorrencias(updated);
     mockDb.saveOcorrencias(updated);
+
+    handleAddAtividade({
+      condominioId: oco.condominioId,
+      categoria: 'ocorrencias',
+      moduloOrigem: 'Módulo 08: Livro de Ocorrências',
+      acao: `Registro de Ocorrência: ${oco.codigo}`,
+      descricao: `${oco.tipo} (${oco.categoria}) - ${oco.descricao.slice(0, 120)}...`,
+      detalhes: `Severidade: ${oco.severidade || 'Média'}. Providências: ${oco.providenciasTomadas || 'Registrado no livro.'}`,
+      operadorNome: oco.operadorNome,
+      nivel: oco.severidade === 'Crítica' ? 'critico' : 'aviso'
+    });
   };
   const handleUpdateOcorrencia = (oco: Ocorrencia) => {
     const updated = ocorrencias.map((o) => (o.id === oco.id ? oco : o));
@@ -431,6 +458,18 @@ export default function App() {
     const updated = [pass, ...passagens];
     setPassagens(updated);
     mockDb.savePassagens(updated);
+
+    handleAddAtividade({
+      condominioId: pass.condominioId,
+      categoria: 'passagem',
+      moduloOrigem: 'Módulo 09: Passagem de Posto',
+      acao: `Troca de Plantão Realizada (${pass.codigo})`,
+      descricao: `Passagem de posto de ${pass.operadorSainteNome} para ${pass.operadorEntranteNome}.`,
+      detalhes: pass.recadosTurno ? `Recados: ${pass.recadosTurno}` : 'Sem divergências ou recados pendentes.',
+      operadorNome: pass.operadorSainteNome,
+      nivel: 'sucesso'
+    });
+
     const novoOp = operadores.find((o) => o.id === novoOpId);
     if (novoOp) {
       setOperadorAtivo(novoOp);
@@ -459,6 +498,15 @@ export default function App() {
     mockDb.saveAutorizados(updated);
   };
 
+  // Handlers do Módulo 12 (Histórico de Atividades & Auditoria)
+  const handleAddAtividade = (
+    item: Omit<HistoricoAtividade, 'id' | 'dataHora'> & { dataHora?: string }
+  ) => {
+    const nova = mockDb.registrarAtividade(item);
+    setAtividades(mockDb.getAtividades());
+    return nova;
+  };
+
   // Autenticação e Consulta de Permissões RBAC & Postos Autorizados
   const executarLogin = (op: Operador) => {
     setLoginErro('');
@@ -475,6 +523,17 @@ export default function App() {
       setCondominioAtivo(autorizados[0]);
       setModalSelecaoPostoAberto(false);
       setOperadorPendente(null);
+
+      handleAddAtividade({
+        condominioId: autorizados[0].id,
+        categoria: 'login',
+        moduloOrigem: 'Módulo 01: Autenticação',
+        acao: 'Início de Turno do Operador',
+        descricao: `Operador ${op.nome} iniciou sessão de plantão no posto.`,
+        operadorId: op.id,
+        operadorNome: `${op.nome} (${op.cargo})`,
+        nivel: 'sucesso'
+      });
     } else {
       // Regra 2: Multi-Postos Autorizados -> Modal de Seleção de Posto
       setOperadorPendente(op);
@@ -509,6 +568,18 @@ export default function App() {
     setOperadorAtivo(operadorPendente);
     setCondominioAtivo(condEscolhido);
     setModalSelecaoPostoAberto(false);
+
+    handleAddAtividade({
+      condominioId: condEscolhido.id,
+      categoria: 'login',
+      moduloOrigem: 'Módulo 01: Autenticação',
+      acao: 'Início de Turno do Operador',
+      descricao: `Operador ${operadorPendente.nome} iniciou sessão no posto ${condEscolhido.nome}.`,
+      operadorId: operadorPendente.id,
+      operadorNome: `${operadorPendente.nome} (${operadorPendente.cargo})`,
+      nivel: 'sucesso'
+    });
+
     setOperadorPendente(null);
   };
 
@@ -534,6 +605,7 @@ export default function App() {
     { id: 'mod08_ocorrencias', label: 'Ocorrências', icon: BookOpen, active: flags.mod08_ocorrencias },
     { id: 'mod09_passagem', label: 'Passagem de Posto', icon: RefreshCw, active: flags.mod09_passagem },
     { id: 'mod10_autorizados', label: 'Autorizados', icon: UserCheck, active: flags.mod10_autorizados },
+    { id: 'mod12_historico', label: 'Histórico', icon: History, active: true },
     { id: 'mod11_relatorios', label: 'Relatórios', icon: FileSpreadsheet, active: true }
   ];
 
@@ -996,6 +1068,16 @@ export default function App() {
             autorizados={autorizados}
             onAddAutorizado={handleAddAutorizado}
             onRegistrarEntradaAutorizado={handleRegistrarEntradaAutorizado}
+          />
+        )}
+
+        {moduloAtivo === 'mod12_historico' && (
+          <Mod12Historico
+            condominioAtivo={condominioAtivo}
+            operadorAtivo={operadorAtivo}
+            operadores={operadores}
+            atividades={atividades}
+            onAddAtividade={handleAddAtividade}
           />
         )}
 

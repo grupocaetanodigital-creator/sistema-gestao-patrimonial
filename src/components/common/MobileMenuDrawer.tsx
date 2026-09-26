@@ -14,7 +14,8 @@ import {
   Settings,
   LogOut,
   Building2,
-  Users
+  Users,
+  History
 } from 'lucide-react';
 import { Condominio, Operador } from '../../types';
 
@@ -62,6 +63,7 @@ export const MobileMenuDrawer: React.FC<MobileMenuDrawerProps> = ({
     { id: 'mod07_ronda', label: 'Rondas QR', icon: QrCode, active: Boolean(f?.mod07_ronda) },
     { id: 'mod08_ocorrencias', label: 'Livro Ocorrências', icon: AlertTriangle, active: Boolean(f?.mod08_ocorrencias) },
     { id: 'mod09_passagem', label: 'Passagem de Posto', icon: ClipboardList, active: Boolean(f?.mod09_passagem) },
+    { id: 'mod12_historico', label: 'Histórico de Atividades', icon: History, active: true },
     { id: 'mod11_relatorios', label: 'Relatórios', icon: FileSpreadsheet, active: true },
     { id: 'mod01_cadastros', label: 'Cadastros & Administração', icon: Settings, active: !isVigilanteOuManutencao }
   ];

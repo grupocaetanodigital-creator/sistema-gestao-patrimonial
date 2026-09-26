@@ -452,6 +452,28 @@ CREATE TABLE IF NOT EXISTS contatos_emergencia (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- 17. TABELA DE HISTÓRICO DE ATIVIDADES E AUDITORIA (MÓDULO 12)
+CREATE TABLE IF NOT EXISTS historico_atividades (
+  id TEXT PRIMARY KEY,
+  condominio_id TEXT NOT NULL REFERENCES condominios(id) ON DELETE CASCADE,
+  codigo TEXT,
+  categoria TEXT NOT NULL,
+  modulo_origem TEXT NOT NULL,
+  acao TEXT NOT NULL,
+  descricao TEXT NOT NULL,
+  detalhes TEXT,
+  operador_id TEXT,
+  operador_nome TEXT NOT NULL,
+  data_hora TEXT NOT NULL,
+  nivel TEXT NOT NULL DEFAULT 'info',
+  metadados JSONB DEFAULT '{}'::jsonb,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_historico_condominio ON historico_atividades(condominio_id);
+CREATE INDEX IF NOT EXISTS idx_historico_categoria ON historico_atividades(categoria);
+CREATE INDEX IF NOT EXISTS idx_historico_data ON historico_atividades(data_hora);
+
 -- HABILITAR RLS COM ACESSO PERMISSIVO PARA ANON KEY
 DO $$
 DECLARE
@@ -462,7 +484,8 @@ BEGIN
       'condominios', 'operadores', 'moradores', 'entregadores',
       'lotes_encomenda', 'itens_encomenda', 'itens_custodia', 'materiais_posto',
       'chaves', 'chamados_manutencao', 'pontos_ronda', 'execucoes_ronda',
-      'ocorrencias', 'passagens_posto', 'autorizados', 'contatos_emergencia'
+      'ocorrencias', 'passagens_posto', 'autorizados', 'contatos_emergencia',
+      'historico_atividades'
     ])
   LOOP
     EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY;', tbl);

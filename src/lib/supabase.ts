@@ -509,6 +509,30 @@ export async function syncLocalToSupabase(): Promise<{ success: boolean; log: st
     totalRecords += contatos.length;
   }
 
+  // 17. Histórico de Atividades & Trilha de Auditoria (Módulo 12)
+  const atividades = mockDatabase.getAtividades();
+  if (atividades.length > 0) {
+    const payload = atividades.map((a) => ({
+      id: a.id,
+      condominio_id: a.condominioId,
+      codigo: a.codigo || null,
+      categoria: a.categoria,
+      modulo_origem: a.moduloOrigem,
+      acao: a.acao,
+      descricao: a.descricao,
+      detalhes: a.detalhes || null,
+      operador_id: a.operadorId || null,
+      operador_nome: a.operadorNome,
+      data_hora: a.dataHora,
+      nivel: a.nivel,
+      metadados: a.metadados || {}
+    }));
+    const { error } = await client.from('historico_atividades').upsert(payload, { onConflict: 'id' });
+    if (error) throw new Error(`Erro ao subir histórico de atividades: ${error.message}`);
+    log.push(`✓ ${atividades.length} Registros do Histórico de Atividades sincronizados`);
+    totalRecords += atividades.length;
+  }
+
   return {
     success: true,
     log,
@@ -916,6 +940,30 @@ export async function syncSupabaseToLocal(): Promise<{ success: boolean; log: st
     }));
     mockDatabase.saveContatosEmergencia(mapeados);
     log.push(`✓ ${mapeados.length} Contatos de emergência baixados`);
+    totalRecords += mapeados.length;
+  }
+
+  // 17. Histórico de Atividades & Auditoria (Módulo 12)
+  const { data: ativData, error: ativError } = await client.from('historico_atividades').select('*');
+  if (ativError) throw new Error(`Erro baixando histórico de atividades: ${ativError.message}`);
+  if (ativData && ativData.length > 0) {
+    const mapeados = ativData.map((a: any) => ({
+      id: a.id,
+      condominioId: a.condominio_id,
+      codigo: a.codigo,
+      categoria: a.categoria,
+      moduloOrigem: a.modulo_origem,
+      acao: a.acao,
+      descricao: a.descricao,
+      detalhes: a.detalhes,
+      operadorId: a.operador_id,
+      operadorNome: a.operador_nome,
+      dataHora: a.data_hora,
+      nivel: a.nivel,
+      metadados: a.metadados
+    }));
+    mockDatabase.saveAtividades(mapeados);
+    log.push(`✓ ${mapeados.length} Registros do Histórico de Atividades baixados`);
     totalRecords += mapeados.length;
   }
 

@@ -34,6 +34,7 @@ export interface FeatureFlags {
   mod08_ocorrencias: boolean;
   mod09_passagem: boolean;
   mod10_autorizados: boolean;
+  mod12_historico?: boolean;
 }
 
 export interface Operador {
@@ -359,3 +360,36 @@ export interface ContatoEmergencia {
   whatsapp?: string;
   descricao?: string;
 }
+
+export type CategoriaAtividade =
+  | 'login'
+  | 'encomendas'
+  | 'custodia'
+  | 'materiais'
+  | 'chaves'
+  | 'manutencao'
+  | 'ronda'
+  | 'ocorrencias'
+  | 'passagem'
+  | 'autorizados'
+  | 'cadastros'
+  | 'geral';
+
+export type NivelAtividade = 'info' | 'sucesso' | 'aviso' | 'critico';
+
+export interface HistoricoAtividade {
+  id: string;
+  condominioId: string;
+  codigo?: string;
+  categoria: CategoriaAtividade;
+  moduloOrigem: string;
+  acao: string;
+  descricao: string;
+  detalhes?: string;
+  operadorId?: string;
+  operadorNome: string;
+  dataHora: string;
+  nivel: NivelAtividade;
+  metadados?: Record<string, any>;
+}
+

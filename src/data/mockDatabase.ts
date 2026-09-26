@@ -15,7 +15,8 @@ import {
   Ocorrencia,
   PassagemPosto,
   Autorizado,
-  ContatoEmergencia
+  ContatoEmergencia,
+  HistoricoAtividade
 } from '../types';
 
 const STORAGE_PREFIX = 'infport_v1_';
@@ -660,6 +661,135 @@ export const INITIAL_CONTATOS_EMERGENCIA: ContatoEmergencia[] = [
   }
 ];
 
+export const INITIAL_ATIVIDADES: HistoricoAtividade[] = [
+  {
+    id: 'ativ_001',
+    condominioId: 'cond_01',
+    codigo: 'LOG-00101',
+    categoria: 'login',
+    moduloOrigem: 'Módulo 01: Autenticação',
+    acao: 'Início de Turno do Operador',
+    descricao: 'Operador Roberto Dias assumiu o plantão diurno da portaria principal.',
+    detalhes: 'Turno: Plantão Diurno (07:00 às 19:00). Checklist inicial de posto validado.',
+    operadorId: 'op_02',
+    operadorNome: 'Roberto Dias (Porteiro)',
+    dataHora: '26/09/2026, 07:02',
+    nivel: 'sucesso'
+  },
+  {
+    id: 'ativ_002',
+    condominioId: 'cond_01',
+    codigo: 'LOG-00102',
+    categoria: 'encomendas',
+    moduloOrigem: 'Módulo 02: Encomendas',
+    acao: 'Recebimento de Lote de Encomendas',
+    descricao: 'Recebido Lote RE260926OP0201 transportado por Mercado Livre com 8 pacotes.',
+    detalhes: 'Entregador: Marcos Souza (Van Renault Master). Triagem iniciada na bancada.',
+    operadorId: 'op_02',
+    operadorNome: 'Roberto Dias (Porteiro)',
+    dataHora: '26/09/2026, 08:35',
+    nivel: 'info'
+  },
+  {
+    id: 'ativ_003',
+    condominioId: 'cond_01',
+    codigo: 'LOG-00103',
+    categoria: 'encomendas',
+    moduloOrigem: 'Módulo 02: Encomendas',
+    acao: 'Baixa e Entrega de Pacote',
+    descricao: 'Baixa da encomenda RE260926OP020101 para morador Carlos Eduardo (Unidade 102B).',
+    detalhes: 'Retirante: Próprio morador. Comprovante com assinatura e foto arquivado.',
+    operadorId: 'op_02',
+    operadorNome: 'Roberto Dias (Porteiro)',
+    dataHora: '26/09/2026, 09:12',
+    nivel: 'sucesso'
+  },
+  {
+    id: 'ativ_004',
+    condominioId: 'cond_01',
+    codigo: 'LOG-00104',
+    categoria: 'chaves',
+    moduloOrigem: 'Módulo 05: Claviculário',
+    acao: 'Retirada de Chave de Área Comum',
+    descricao: 'Retirada da chave CHV-01 (Casa de Máquinas / Barrilete) por técnico autorizado.',
+    detalhes: 'Solicitante: Paulo Ferreira (Empresa HidroTech). Previsão de devolução: 12:00.',
+    operadorId: 'op_02',
+    operadorNome: 'Roberto Dias (Porteiro)',
+    dataHora: '26/09/2026, 09:40',
+    nivel: 'aviso'
+  },
+  {
+    id: 'ativ_005',
+    condominioId: 'cond_01',
+    codigo: 'LOG-00105',
+    categoria: 'ronda',
+    moduloOrigem: 'Módulo 07: Rondas',
+    acao: 'Execução de Ronda Patrimonial Concluída',
+    descricao: 'Ronda periódica ROND260926OP0301 executada com 100% dos checkpoints validados.',
+    detalhes: 'Vigilante: Carlos Eduardo. Total de 8 pontos lidos (QR Code/NFC) sem anomalias.',
+    operadorId: 'op_03',
+    operadorNome: 'Carlos Eduardo (Vigilante Ronda)',
+    dataHora: '26/09/2026, 10:15',
+    nivel: 'sucesso'
+  },
+  {
+    id: 'ativ_006',
+    condominioId: 'cond_01',
+    codigo: 'LOG-00106',
+    categoria: 'ocorrencias',
+    moduloOrigem: 'Módulo 08: Livro de Ocorrências',
+    acao: 'Registro de Ocorrência Regimental',
+    descricao: 'Registrada advertência por descarte de entulho em local proibido (Unidade 404B).',
+    detalhes: 'Classificação: Morador (Regimento). Foto anexada. Notificação gerada para administradora.',
+    operadorId: 'op_02',
+    operadorNome: 'Roberto Dias (Porteiro)',
+    dataHora: '26/09/2026, 11:20',
+    nivel: 'critico'
+  },
+  {
+    id: 'ativ_007',
+    condominioId: 'cond_01',
+    codigo: 'LOG-00107',
+    categoria: 'autorizados',
+    moduloOrigem: 'Módulo 10: Autorizados & Visitantes',
+    acao: 'Check-in de Prestador de Serviço',
+    descricao: 'Entrada autorizada do prestador André Silva (Pintura & Acabamentos) para Apt 201A.',
+    detalhes: 'Crachá 04 entregue. Horário de obras verificado e liberado.',
+    operadorId: 'op_02',
+    operadorNome: 'Roberto Dias (Porteiro)',
+    dataHora: '26/09/2026, 11:45',
+    nivel: 'info'
+  },
+  {
+    id: 'ativ_008',
+    condominioId: 'cond_02',
+    codigo: 'LOG-00201',
+    categoria: 'login',
+    moduloOrigem: 'Módulo 01: Autenticação',
+    acao: 'Início de Turno do Operador',
+    descricao: 'Operador Marcos Silva assumiu o posto Residencial Vila Suíça.',
+    detalhes: 'Turno Plantão Diurno. Acesso autorizado ao módulo de encomendas e portaria.',
+    operadorId: 'op_04',
+    operadorNome: 'Marcos Silva (Porteiro)',
+    dataHora: '26/09/2026, 06:58',
+    nivel: 'sucesso'
+  },
+  {
+    id: 'ativ_009',
+    condominioId: 'cond_03',
+    codigo: 'LOG-00301',
+    categoria: 'login',
+    moduloOrigem: 'Módulo 01: Autenticação',
+    acao: 'Início de Turno do Operador',
+    descricao: 'Operador Roberto Dias assumiu o posto Point Perus.',
+    detalhes: 'Operação padrão de guarita diurna.',
+    operadorId: 'op_02',
+    operadorNome: 'Roberto Dias (Porteiro)',
+    dataHora: '26/09/2026, 07:00',
+    nivel: 'sucesso'
+  }
+];
+
 // ----------------- STORE HOOKS & PERSISTÊNCIA -----------------
 
 export const mockDb = {
@@ -757,7 +887,22 @@ export const mockDb = {
   saveAutorizados: (data: Autorizado[]) => setStored('autorizados', data),
 
   getContatosEmergencia: () => getStored('contatos_emergencia', INITIAL_CONTATOS_EMERGENCIA),
-  saveContatosEmergencia: (data: ContatoEmergencia[]) => setStored('contatos_emergencia', data)
+  saveContatosEmergencia: (data: ContatoEmergencia[]) => setStored('contatos_emergencia', data),
+
+  getAtividades: () => getStored<HistoricoAtividade[]>('historico_atividades', INITIAL_ATIVIDADES),
+  saveAtividades: (data: HistoricoAtividade[]) => setStored('historico_atividades', data),
+  registrarAtividade: (item: Omit<HistoricoAtividade, 'id' | 'dataHora'> & { dataHora?: string }): HistoricoAtividade => {
+    const list = getStored<HistoricoAtividade[]>('historico_atividades', INITIAL_ATIVIDADES);
+    const nova: HistoricoAtividade = {
+      ...item,
+      id: `ativ_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
+      codigo: item.codigo || `LOG-${Date.now().toString().slice(-5)}`,
+      dataHora: item.dataHora || new Date().toLocaleString('pt-BR')
+    };
+    const updated = [nova, ...list];
+    setStored('historico_atividades', updated);
+    return nova;
+  }
 };
 
 export const mockDatabase = mockDb;
