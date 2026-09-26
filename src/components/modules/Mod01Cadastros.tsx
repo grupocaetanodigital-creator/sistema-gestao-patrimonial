@@ -201,6 +201,8 @@ export const Mod01Cadastros: React.FC<Mod01CadastrosProps> = ({
     setTurnoNoturnoFim(condominioAtivo.turnos?.noturno.fim || '07:00');
     setFlags(condominioAtivo.featureFlags);
     setCondominioBackupId(condominioAtivo.id);
+    setFiltroPostoOperador('ativo');
+    setBuscaOperador('');
   }, [condominioAtivo]);
 
   // Handlers para Locais de Armazenamento
@@ -385,7 +387,7 @@ export const Mod01Cadastros: React.FC<Mod01CadastrosProps> = ({
   const [opAcessoTodos, setOpAcessoTodos] = useState(false);
   const [opErroValidacao, setOpErroValidacao] = useState('');
   const [buscaOperador, setBuscaOperador] = useState('');
-  const [filtroPostoOperador, setFiltroPostoOperador] = useState<'todos' | 'ativo'>('todos');
+  const [filtroPostoOperador, setFiltroPostoOperador] = useState<'todos' | 'ativo'>('ativo');
 
   const abrirModalOperador = (op?: Operador) => {
     setOpErroValidacao('');
@@ -553,31 +555,59 @@ export const Mod01Cadastros: React.FC<Mod01CadastrosProps> = ({
     setModalMorador(false);
   };
 
-  // Contagem de operadores autorizados neste condomínio
-  const operadoresDoPostoCount = operadores.filter((op) => {
-    const isMaster = op.cargo === 'Desenvolvedor Master' || op.login === 'admin' || op.role === 'master';
-    const isTodos = op.condominiosAutorizados?.includes('TODOS');
-    const isVinculado = op.condominiosAutorizados?.includes(condominioAtivo.id);
-    return isMaster || isTodos || isVinculado;
-  }).length;
+  // Helper de verificação precisa se o operador está vinculado ao condomínio/posto ativo
+  const isOperadorVinculadoAoPosto = (op: Operador, cond: Condominio): boolean => {
+    if (!op || !cond) return false;
 
-  // Filtragem com suporte a filtroPostoOperador e busca textual
+    // 1. Cargo Master ou login admin possui acesso global irrestrito
+    if (op.cargo === 'Desenvolvedor Master' || op.login === 'admin' || op.role === 'master') {
+      return true;
+    }
+
+    // 2. Supervisor ou Operador com autorização global declarada 'TODOS'
+    const lista = Array.isArray(op.condominiosAutorizados)
+      ? op.condominiosAutorizados
+      : typeof (op as any).condominiosAutorizados === 'string'
+      ? (op as any).condominiosAutorizados.split(',').map((s: string) => s.trim())
+      : Array.isArray((op as any).condominios_autorizados)
+      ? (op as any).condominios_autorizados
+      : [];
+
+    if (lista.includes('TODOS') || lista.includes('todos')) {
+      return true;
+    }
+
+    // 3. Vínculo direto por ID, código ou nome
+    const cId = cond.id.toLowerCase().trim();
+    const cCod = (cond.codigo || '').toLowerCase().trim();
+    const cNome = (cond.nome || '').toLowerCase().trim();
+
+    return lista.some((item: any) => {
+      if (!item) return false;
+      const str = String(item).toLowerCase().trim();
+      return str === cId || str === cCod || str === cNome;
+    });
+  };
+
+  // Contagem de operadores autorizados neste condomínio
+  const operadoresDoPostoCount = operadores.filter((op) => isOperadorVinculadoAoPosto(op, condominioAtivo)).length;
+
+  // Filtragem: por posto ativo (padrão) e por busca textual
   const operadoresDoCondominio = operadores.filter((o) => {
-    // 1. Filtro por Posto / Condomínio Ativo
+    // 1. Filtro por Posto / Condomínio Ativo (padrão: somente operadores vinculados a este condomínio)
     if (filtroPostoOperador === 'ativo') {
-      const isMaster = o.cargo === 'Desenvolvedor Master' || o.login === 'admin' || o.role === 'master';
-      const isTodos = o.condominiosAutorizados?.includes('TODOS');
-      const isVinculado = o.condominiosAutorizados?.includes(condominioAtivo.id);
-      if (!isMaster && !isTodos && !isVinculado) return false;
+      if (!isOperadorVinculadoAoPosto(o, condominioAtivo)) {
+        return false;
+      }
     }
 
     // 2. Busca por texto
     if (buscaOperador.trim()) {
-      const q = buscaOperador.toLowerCase();
-      const matchNome = o.nome.toLowerCase().includes(q);
-      const matchLogin = o.login.toLowerCase().includes(q);
-      const matchCargo = o.cargo.toLowerCase().includes(q);
-      const matchCodigo = o.codigo.toLowerCase().includes(q);
+      const q = buscaOperador.toLowerCase().trim();
+      const matchNome = (o.nome || '').toLowerCase().includes(q);
+      const matchLogin = (o.login || '').toLowerCase().includes(q);
+      const matchCargo = (o.cargo || '').toLowerCase().includes(q);
+      const matchCodigo = (o.codigo || '').toLowerCase().includes(q);
       return matchNome || matchLogin || matchCargo || matchCodigo;
     }
 
@@ -1178,28 +1208,96 @@ export const Mod01Cadastros: React.FC<Mod01CadastrosProps> = ({
             <div className="flex items-center gap-1 bg-slate-900 p-1 rounded-xl border border-slate-800 text-xs">
               <button
                 type="button"
-                onClick={() => setFiltroPostoOperador('todos')}
-                className={`px-3 py-1.5 rounded-lg font-bold transition-colors ${
-                  filtroPostoOperador === 'todos'
-                    ? 'bg-emerald-600 text-white'
+                onClick={() => setFiltroPostoOperador('ativo')}
+                className={`px-3 py-1.5 rounded-lg font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                  filtroPostoOperador === 'ativo'
+                    ? 'bg-emerald-600 text-white shadow-md shadow-emerald-950/50'
                     : 'text-slate-400 hover:text-white'
                 }`}
+                title={`Exibir operadores vinculados a ${condominioAtivo.nome}`}
               >
-                Todos os Operadores ({operadores.length})
+                <Building2 className="w-3.5 h-3.5" />
+                <span>Deste Condomínio ({operadoresDoPostoCount})</span>
               </button>
               <button
                 type="button"
-                onClick={() => setFiltroPostoOperador('ativo')}
-                className={`px-3 py-1.5 rounded-lg font-bold transition-colors ${
-                  filtroPostoOperador === 'ativo'
-                    ? 'bg-emerald-600 text-white'
+                onClick={() => setFiltroPostoOperador('todos')}
+                className={`px-3 py-1.5 rounded-lg font-bold transition-all cursor-pointer ${
+                  filtroPostoOperador === 'todos'
+                    ? 'bg-slate-750 text-white shadow-md'
                     : 'text-slate-400 hover:text-white'
                 }`}
+                title="Exibir todos os operadores cadastrados no sistema"
               >
-                Deste Condomínio ({operadoresDoPostoCount})
+                Todos os Operadores ({operadores.length})
               </button>
             </div>
           </div>
+
+          {/* Indicador de Status do Filtro do Posto */}
+          <div className="flex items-center justify-between text-xs px-1 text-slate-400">
+            <span className="flex items-center gap-1.5">
+              <span className={`w-2 h-2 rounded-full ${filtroPostoOperador === 'ativo' ? 'bg-emerald-400 animate-pulse' : 'bg-slate-500'}`} />
+              {filtroPostoOperador === 'ativo' ? (
+                <>
+                  Exibindo <strong>{operadoresDoCondominio.length}</strong> operador(es) vinculado(s) ao posto <strong className="text-white">{condominioAtivo.nome}</strong> ({condominioAtivo.codigo})
+                </>
+              ) : (
+                <>
+                  Exibindo todos os <strong>{operadoresDoCondominio.length}</strong> operadores da base geral do sistema
+                </>
+              )}
+            </span>
+            {filtroPostoOperador === 'todos' && (
+              <button
+                type="button"
+                onClick={() => setFiltroPostoOperador('ativo')}
+                className="text-[11px] text-emerald-400 hover:underline font-semibold cursor-pointer"
+              >
+                ← Filtrar apenas deste condomínio
+              </button>
+            )}
+          </div>
+
+          {/* Empty State se nenhum operador for encontrado */}
+          {operadoresDoCondominio.length === 0 && (
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-8 text-center space-y-3">
+              <Users className="w-10 h-10 text-slate-600 mx-auto" />
+              <h3 className="text-sm font-bold text-white">Nenhum operador encontrado</h3>
+              <p className="text-xs text-slate-400 max-w-md mx-auto">
+                {buscaOperador
+                  ? `Nenhum operador corresponde aos termos de busca "${buscaOperador}".`
+                  : `Não há operadores com autorização de acesso ao condomínio "${condominioAtivo.nome}".`}
+              </p>
+              <div className="pt-2 flex flex-wrap items-center justify-center gap-2">
+                {buscaOperador && (
+                  <button
+                    type="button"
+                    onClick={() => setBuscaOperador('')}
+                    className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold rounded-xl"
+                  >
+                    Limpar Busca
+                  </button>
+                )}
+                {filtroPostoOperador === 'ativo' && (
+                  <button
+                    type="button"
+                    onClick={() => setFiltroPostoOperador('todos')}
+                    className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-emerald-400 text-xs font-bold rounded-xl"
+                  >
+                    Ver Todos os Operadores ({operadores.length})
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => abrirModalOperador()}
+                  className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-xl"
+                >
+                  + Vincular Operador a este Posto
+                </button>
+              </div>
+            </div>
+          )}
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             {operadoresDoCondominio.map((op) => {
