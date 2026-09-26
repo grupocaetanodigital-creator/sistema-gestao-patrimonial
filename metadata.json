@@ -1,0 +1,6 @@
+{
+  "name": "INFPORT — Sistema Multi Portaria 1.0",
+  "description": "Sistema de gestão operacional para portarias e postos multi-condomínio com controle de encomendas, custódia, materiais, chaves, manutenção, rondas e passagem de turno.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

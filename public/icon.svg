@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#022c22"/>
+      <stop offset="50%" stop-color="#064e3b"/>
+      <stop offset="100%" stop-color="#022c22"/>
+    </linearGradient>
+    <linearGradient id="shieldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#34d399"/>
+      <stop offset="100%" stop-color="#059669"/>
+    </linearGradient>
+    <linearGradient id="glow" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#6ee7b7" stop-opacity="0.8"/>
+      <stop offset="100%" stop-color="#10b981" stop-opacity="0.3"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Fundo Dark Navy / Emerald -->
+  <rect width="512" height="512" rx="112" fill="url(#bg)"/>
+
+  <!-- Borda Sutil -->
+  <rect width="504" height="504" x="4" y="4" rx="108" fill="none" stroke="#10b981" stroke-width="6" stroke-opacity="0.4"/>
+
+  <!-- Escudo Central de Segurança -->
+  <path d="M256 70 L390 125 C390 280 256 395 256 425 C256 395 122 280 122 125 Z" 
+        fill="#047857" stroke="url(#shieldGrad)" stroke-width="14" stroke-linejoin="round"/>
+
+  <!-- Brilho Interno do Escudo -->
+  <path d="M256 100 L360 145 C360 260 256 360 256 385 C256 360 152 260 152 145 Z" 
+        fill="none" stroke="url(#glow)" stroke-width="6" stroke-linejoin="round" opacity="0.6"/>
+
+  <!-- Checkmark / Ícone de Proteção -->
+  <path d="M210 240 L245 275 L305 200" 
+        fill="none" stroke="#ecfdf5" stroke-width="22" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <!-- Tipografia INFPORT na base -->
+  <text x="256" y="468" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="44" font-weight="900" fill="#a7f3d0" letter-spacing="4">INFPORT</text>
+</svg>
