@@ -1100,3 +1100,35 @@ export async function uploadPhotoToSupabase(
     return typeof dataUrlOrFile === 'string' ? dataUrlOrFile : '';
   }
 }
+
+/**
+ * Envia um registro de atividade imediatamente para o Supabase em background (se conectado)
+ */
+export async function pushAtividadeToSupabase(a: any): Promise<void> {
+  const client = getSupabaseClient();
+  if (!client) return;
+
+  try {
+    await client.from('historico_atividades').upsert(
+      {
+        id: a.id,
+        condominio_id: a.condominioId,
+        codigo: a.codigo,
+        categoria: a.categoria,
+        modulo_origem: a.moduloOrigem,
+        acao: a.acao,
+        descricao: a.descricao,
+        detalhes: a.detalhes || null,
+        operador_id: a.operadorId || null,
+        operador_nome: a.operadorNome,
+        data_hora: a.dataHora,
+        nivel: a.nivel,
+        metadados: a.metadados || {}
+      },
+      { onConflict: 'id' }
+    );
+  } catch (err) {
+    console.warn('Erro ao sincronizar atividade imediatamente com Supabase:', err);
+  }
+}
+

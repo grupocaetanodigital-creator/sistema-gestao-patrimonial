@@ -26,6 +26,7 @@ import {
   History
 } from 'lucide-react';
 import { audioAlert } from './lib/audioAlert';
+import { pushAtividadeToSupabase } from './lib/supabase';
 import {
   Condominio,
   Operador,
@@ -226,12 +227,34 @@ export default function App() {
     return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
   };
 
-  // Handlers do Módulo 01
+  // Handlers do Módulo 12 (Histórico de Atividades & Auditoria)
+  const handleAddAtividade = (
+    item: Omit<HistoricoAtividade, 'id' | 'dataHora'> & { dataHora?: string }
+  ) => {
+    const nova = mockDb.registrarAtividade(item);
+    setAtividades(mockDb.getAtividades());
+    pushAtividadeToSupabase(nova).catch(() => {});
+    return nova;
+  };
+
+  // Handlers do Módulo 01 (Cadastros & Postos)
   const handleAddCondominio = (cond: Condominio) => {
     const updated = [...condominios, cond];
     setCondominios(updated);
     mockDb.saveCondominios(updated);
+
+    handleAddAtividade({
+      condominioId: cond.id,
+      categoria: 'cadastros',
+      moduloOrigem: 'Módulo 01: Cadastros',
+      acao: `Novo Condomínio Cadastrado (${cond.codigo})`,
+      descricao: `Condomínio "${cond.nome}" cadastrado com sucesso.`,
+      detalhes: `Endereço: ${cond.endereco || 'Não informado'} | Síndico: ${cond.nomeSindico || 'Não informado'}.`,
+      operadorNome: operadorAtivo ? `${operadorAtivo.nome} (${operadorAtivo.cargo})` : 'Administrador',
+      nivel: 'sucesso'
+    });
   };
+
   const handleUpdateCondominio = (cond: Condominio) => {
     const updated = condominios.map((c) => (c.id === cond.id ? cond : c));
     setCondominios(updated);
@@ -239,26 +262,93 @@ export default function App() {
     if (condominioAtivo.id === cond.id) {
       setCondominioAtivo(cond);
     }
+
+    handleAddAtividade({
+      condominioId: cond.id,
+      categoria: 'cadastros',
+      moduloOrigem: 'Módulo 01: Cadastros',
+      acao: `Configurações do Condomínio Atualizadas (${cond.codigo})`,
+      descricao: `Parâmetros operacionais e cadastrais do posto "${cond.nome}" foram alterados.`,
+      detalhes: `Estrutura: ${cond.tipoEstrutura || 'Blocos'} | Blocos: ${cond.quantidadeBlocos || '-'} | Unidades: ${cond.unidadesPorBloco || '-'}.`,
+      operadorNome: operadorAtivo ? `${operadorAtivo.nome} (${operadorAtivo.cargo})` : 'Administrador',
+      nivel: 'info'
+    });
   };
+
   const handleAddOperador = (op: Operador) => {
     const updated = [...operadores, op];
     setOperadores(updated);
     mockDb.saveOperadores(updated);
+
+    const postosTexto = op.condominiosAutorizados?.includes('TODOS')
+      ? 'Acesso Global (Todos)'
+      : op.condominiosAutorizados?.join(', ') || 'Nenhum';
+
+    handleAddAtividade({
+      condominioId: condominioAtivo.id,
+      categoria: 'cadastros',
+      moduloOrigem: 'Módulo 01: Cadastros (RBAC)',
+      acao: `Novo Operador Cadastrado (${op.codigo})`,
+      descricao: `${op.nome} (${op.cargo}) registrado com login "${op.login}".`,
+      detalhes: `Perfil de Acesso: ${op.role.toUpperCase()} | Postos Autorizados: ${postosTexto}.`,
+      operadorNome: operadorAtivo ? `${operadorAtivo.nome} (${operadorAtivo.cargo})` : 'Supervisor',
+      nivel: 'sucesso'
+    });
   };
+
   const handleUpdateOperador = (op: Operador) => {
     const updated = operadores.map((o) => (o.id === op.id ? op : o));
     setOperadores(updated);
     mockDb.saveOperadores(updated);
+
+    const postosTexto = op.condominiosAutorizados?.includes('TODOS')
+      ? 'Acesso Global (Todos)'
+      : op.condominiosAutorizados?.join(', ') || 'Nenhum';
+
+    handleAddAtividade({
+      condominioId: condominioAtivo.id,
+      categoria: 'cadastros',
+      moduloOrigem: 'Módulo 01: Cadastros (RBAC)',
+      acao: `Operador / Postos Atualizados (${op.codigo})`,
+      descricao: `Atualização cadastral do operador ${op.nome} (${op.cargo}).`,
+      detalhes: `Perfil: ${op.role.toUpperCase()} | Postos Autorizados: ${postosTexto}.`,
+      operadorNome: operadorAtivo ? `${operadorAtivo.nome} (${operadorAtivo.cargo})` : 'Supervisor',
+      nivel: 'info'
+    });
   };
+
   const handleAddMorador = (morador: Morador) => {
     const updated = [...moradores, morador];
     setMoradores(updated);
     mockDb.saveMoradores(updated);
+
+    handleAddAtividade({
+      condominioId: morador.condominioId,
+      categoria: 'cadastros',
+      moduloOrigem: 'Módulo 01: Cadastros',
+      acao: `Novo Morador Cadastrado (${morador.codigo})`,
+      descricao: `${morador.nomeCompleto} - Unidade: ${morador.unidade} (${morador.tipoVinculo}).`,
+      detalhes: `WhatsApp: ${morador.whatsapp || 'Não informado'}.`,
+      operadorNome: operadorAtivo ? `${operadorAtivo.nome} (${operadorAtivo.cargo})` : 'Porteiro',
+      nivel: 'info'
+    });
   };
+
   const handleUpdateMorador = (morador: Morador) => {
     const updated = moradores.map((m) => (m.id === morador.id ? morador : m));
     setMoradores(updated);
     mockDb.saveMoradores(updated);
+
+    handleAddAtividade({
+      condominioId: morador.condominioId,
+      categoria: 'cadastros',
+      moduloOrigem: 'Módulo 01: Cadastros',
+      acao: `Cadastro de Morador Atualizado (${morador.codigo})`,
+      descricao: `${morador.nomeCompleto} - Unidade: ${morador.unidade} (${morador.tipoVinculo}).`,
+      detalhes: `WhatsApp: ${morador.whatsapp || 'Não informado'}.`,
+      operadorNome: operadorAtivo ? `${operadorAtivo.nome} (${operadorAtivo.cargo})` : 'Porteiro',
+      nivel: 'info'
+    });
   };
 
   // Handlers do Módulo 02 (Encomendas)
@@ -266,7 +356,19 @@ export default function App() {
     const updated = [lote, ...lotes];
     setLotes(updated);
     mockDb.saveLotes(updated);
+
+    handleAddAtividade({
+      condominioId: lote.condominioId,
+      categoria: 'encomendas',
+      moduloOrigem: 'Módulo 02: Encomendas & Triagem',
+      acao: `Chegada de Lote de Entregas (${lote.codigoRE})`,
+      descricao: `Entregador: ${lote.entregadorNome} (${lote.empresa}). Qtd declarada: ${lote.quantidadeDeclarada} volume(s).`,
+      detalhes: `Horário: ${lote.dataHora}. Status: ${lote.status}.`,
+      operadorNome: lote.operadorNome || operadorAtivo?.nome || 'Porteiro',
+      nivel: 'info'
+    });
   };
+
   const handleAddItemEncomenda = (item: ItemEncomenda) => {
     const updatedItens = [item, ...itensEncomenda];
     setItensEncomenda(updatedItens);
@@ -277,9 +379,22 @@ export default function App() {
     );
     setLotes(updatedLotes);
     mockDb.saveLotes(updatedLotes);
+
+    handleAddAtividade({
+      condominioId: item.condominioId,
+      categoria: 'encomendas',
+      moduloOrigem: 'Módulo 02: Encomendas & Triagem',
+      acao: `Triagem de Pacote: ${item.codigoRE}`,
+      descricao: `Volume triado para a unidade ${item.unidade} (Destinatário: ${item.moradorNome || 'Não informado'}).`,
+      detalhes: `Armazenamento: ${item.localArmazenamento || 'Bancada'} | Rastreio: ${item.codigoRastreio || 'Sem rastreio'}.${item.fotoEtiquetaUrl ? ' Foto da etiqueta anexada.' : ''}`,
+      operadorNome: item.operadorRecebimentoNome || operadorAtivo?.nome || 'Porteiro',
+      nivel: 'info'
+    });
   };
+
   const handleBaixaItensEncomenda = (ids: string[], retiranteNome: string, fotoUrl: string) => {
     const agora = new Date().toLocaleString('pt-BR');
+    const itensEntregues = itensEncomenda.filter((i) => ids.includes(i.id));
     const updated = itensEncomenda.map((i) =>
       ids.includes(i.id)
         ? {
@@ -294,11 +409,37 @@ export default function App() {
     );
     setItensEncomenda(updated);
     mockDb.saveItensEncomenda(updated);
+
+    const reCodigos = itensEntregues.map((i) => i.codigoRE).join(', ');
+    const unidades = Array.from(new Set(itensEntregues.map((i) => i.unidade))).join(', ');
+
+    handleAddAtividade({
+      condominioId: condominioAtivo.id,
+      categoria: 'encomendas',
+      moduloOrigem: 'Módulo 02: Encomendas & Triagem',
+      acao: `Baixa / Entrega de Encomenda (${itensEntregues.length} volume(s))`,
+      descricao: `Entregue para "${retiranteNome}" referente à(s) unidade(s) ${unidades}.`,
+      detalhes: `Código(s) RE: ${reCodigos}. Foto do comprovante registrada.${fotoUrl ? ' (Com foto anexada)' : ''}`,
+      operadorNome: operadorAtivo?.nome || 'Porteiro',
+      nivel: 'sucesso'
+    });
   };
+
   const handleAddEntregador = (ent: Entregador) => {
     const updated = [...entregadores, ent];
     setEntregadores(updated);
     mockDb.saveEntregadores(updated);
+
+    handleAddAtividade({
+      condominioId: condominioAtivo.id,
+      categoria: 'encomendas',
+      moduloOrigem: 'Módulo 02: Encomendas & Triagem',
+      acao: `Cadastro de Entregador: ${ent.nome}`,
+      descricao: `Transportadora / Empresa: ${ent.empresa || 'Autônomo'}. Documento: ${ent.documento || 'Não informado'}.`,
+      detalhes: `Código: ${ent.codigo}. Cadastrado na base do posto.`,
+      operadorNome: operadorAtivo?.nome || 'Porteiro',
+      nivel: 'info'
+    });
   };
 
   // Handlers do Módulo 03 (Custódia)
@@ -306,8 +447,21 @@ export default function App() {
     const updated = [item, ...custodias];
     setCustodias(updated);
     mockDb.saveCustodias(updated);
+
+    handleAddAtividade({
+      condominioId: item.condominioId,
+      categoria: 'custodia',
+      moduloOrigem: 'Módulo 03: Custódia de Itens',
+      acao: `Depósito em Custódia: ${item.codigo}`,
+      descricao: `Fluxo: ${item.fluxo} - ${item.descricaoItem}.`,
+      detalhes: `Origem: ${item.origemDescricao} → Destino: ${item.destinoDescricao}.${item.fotoItemUrl ? ' Foto do item registrada.' : ''}`,
+      operadorNome: item.operadorEntradaNome || operadorAtivo?.nome || 'Porteiro',
+      nivel: 'aviso'
+    });
   };
+
   const handleBaixaCustodia = (id: string, retiranteNome: string, fotoUrl: string, doc?: string) => {
+    const item = custodias.find((c) => c.id === id);
     const updated = custodias.map((c) =>
       c.id === id
         ? {
@@ -323,6 +477,17 @@ export default function App() {
     );
     setCustodias(updated);
     mockDb.saveCustodias(updated);
+
+    handleAddAtividade({
+      condominioId: item?.condominioId || condominioAtivo.id,
+      categoria: 'custodia',
+      moduloOrigem: 'Módulo 03: Custódia de Itens',
+      acao: `Baixa / Devolução de Custódia (${item?.codigo || id})`,
+      descricao: `Item "${item?.descricaoItem || 'Custódia'}" retirado por "${retiranteNome}".`,
+      detalhes: `Documento: ${doc || 'Não informado'}. Foto da baixa anexada.${fotoUrl ? ' (Com foto)' : ''}`,
+      operadorNome: operadorAtivo?.nome || 'Porteiro',
+      nivel: 'sucesso'
+    });
   };
 
   // Handlers do Módulo 04 (Materiais)
@@ -330,13 +495,26 @@ export default function App() {
     const updated = [...materiais, item];
     setMateriais(updated);
     mockDb.saveMateriais(updated);
+
+    handleAddAtividade({
+      condominioId: item.condominioId,
+      categoria: 'materiais',
+      moduloOrigem: 'Módulo 04: Materiais & Inventário',
+      acao: `Novo Material Cadastrado (${item.codigo})`,
+      descricao: `${item.nome} (${item.categoria}) - Quantidade: ${item.quantidade}. Estado: ${item.estado}.`,
+      detalhes: `Propriedade: ${item.propriedade} | N° Série / Tag: ${item.numeroSerieTag || 'S/N'}.`,
+      operadorNome: operadorAtivo?.nome || 'Operador',
+      nivel: 'info'
+    });
   };
+
   const handleUpdateStatusMaterial = (
     id: string,
     estado: MaterialPosto['estado'],
     obs?: string,
     fotoAvaria?: string
   ) => {
+    const mat = materiais.find((m) => m.id === id);
     const updated = materiais.map((m) =>
       m.id === id
         ? {
@@ -350,6 +528,17 @@ export default function App() {
     );
     setMateriais(updated);
     mockDb.saveMateriais(updated);
+
+    handleAddAtividade({
+      condominioId: mat?.condominioId || condominioAtivo.id,
+      categoria: 'materiais',
+      moduloOrigem: 'Módulo 04: Materiais & Inventário',
+      acao: `Conferência de Ativo: ${mat?.nome || id} → ${estado}`,
+      descricao: `Estado atualizado para "${estado}" na conferência de guarita.`,
+      detalhes: obs ? `Avaria / Observação: ${obs}` : 'Material conferido e em boas condições operacionais.',
+      operadorNome: operadorAtivo?.nome || 'Operador',
+      nivel: estado === 'Operacional' ? 'sucesso' : 'critico'
+    });
   };
 
   // Handlers do Módulo 05 (Chaves)
@@ -357,13 +546,39 @@ export default function App() {
     const updated = [...chaves, chave];
     setChaves(updated);
     mockDb.saveChaves(updated);
+
+    handleAddAtividade({
+      condominioId: chave.condominioId,
+      categoria: 'chaves',
+      moduloOrigem: 'Módulo 05: Claviculário Digital',
+      acao: `Nova Chave Cadastrada (${chave.codigo})`,
+      descricao: `Etiqueta: ${chave.etiquetaClaviculario} - ${chave.nome} (${chave.categoria}).`,
+      detalhes: chave.tempoMaximoHoras ? `Tempo limite de permanência: ${chave.tempoMaximoHoras}h.` : 'Disponível no claviculário.',
+      operadorNome: operadorAtivo?.nome || 'Operador',
+      nivel: 'info'
+    });
   };
+
   const handleRetirarChave = (id: string, dados: Partial<Chave>) => {
+    const chave = chaves.find((c) => c.id === id);
     const updated = chaves.map((c) => (c.id === id ? { ...c, ...dados } : c));
     setChaves(updated);
     mockDb.saveChaves(updated);
+
+    handleAddAtividade({
+      condominioId: chave?.condominioId || condominioAtivo.id,
+      categoria: 'chaves',
+      moduloOrigem: 'Módulo 05: Claviculário Digital',
+      acao: `Retirada de Chave: [${chave?.etiquetaClaviculario}] ${chave?.nome}`,
+      descricao: `Retirada por "${dados.solicitanteNome}" (${dados.solicitanteTipo} - ${dados.solicitanteDetalhe}).`,
+      detalhes: `Motivo: ${dados.motivoRetirada || 'Serviço/Acesso'} | Previsão de Devolução: ${dados.previsaoDevolucao || 'Não informada'}.`,
+      operadorNome: dados.operadorRetiradaNome || operadorAtivo?.nome || 'Porteiro',
+      nivel: 'aviso'
+    });
   };
+
   const handleDevolverChave = (id: string, motivoAvaria?: string, fotoAvaria?: string) => {
+    const chave = chaves.find((c) => c.id === id);
     const updated = chaves.map((c) =>
       c.id === id
         ? {
@@ -383,6 +598,17 @@ export default function App() {
     );
     setChaves(updated);
     mockDb.saveChaves(updated);
+
+    handleAddAtividade({
+      condominioId: chave?.condominioId || condominioAtivo.id,
+      categoria: 'chaves',
+      moduloOrigem: 'Módulo 05: Claviculário Digital',
+      acao: `Devolução de Chave: [${chave?.etiquetaClaviculario}] ${chave?.nome}`,
+      descricao: `Chave devolvida ao claviculário digital e liberada para novo uso.`,
+      detalhes: motivoAvaria ? `Observação / Avaria na entrega: ${motivoAvaria}` : 'Devolução regular sem divergências.',
+      operadorNome: operadorAtivo?.nome || 'Porteiro',
+      nivel: motivoAvaria ? 'aviso' : 'sucesso'
+    });
   };
 
   // Handlers do Módulo 06 (Manutenção)
@@ -390,8 +616,21 @@ export default function App() {
     const updated = [chamado, ...chamados];
     setChamados(updated);
     mockDb.saveChamados(updated);
+
+    handleAddAtividade({
+      condominioId: chamado.condominioId,
+      categoria: 'manutencao',
+      moduloOrigem: 'Módulo 06: Manutenção Predial',
+      acao: `Abertura de Chamado: ${chamado.codigoOS}`,
+      descricao: `${chamado.titulo} (${chamado.categoria}) - Local: ${chamado.localizacao}.`,
+      detalhes: `Prioridade: ${chamado.prioridade} | Descrição: ${chamado.descricao.slice(0, 100)}...`,
+      operadorNome: chamado.operadorAberturaNome || operadorAtivo?.nome || 'Operador',
+      nivel: chamado.prioridade === 'Alta' ? 'critico' : 'aviso'
+    });
   };
+
   const handleConcluirChamado = (id: string, solucao: string, fotoDepois: string) => {
+    const chamado = chamados.find((c) => c.id === id);
     const updated = chamados.map((c) =>
       c.id === id
         ? {
@@ -405,6 +644,17 @@ export default function App() {
     );
     setChamados(updated);
     mockDb.saveChamados(updated);
+
+    handleAddAtividade({
+      condominioId: chamado?.condominioId || condominioAtivo.id,
+      categoria: 'manutencao',
+      moduloOrigem: 'Módulo 06: Manutenção Predial',
+      acao: `Chamado Concluído (${chamado?.codigoOS || id})`,
+      descricao: `Chamado "${chamado?.titulo}" finalizado com parecer de conclusão.`,
+      detalhes: `Solução executada: ${solucao}.${fotoDepois ? ' Foto do resultado anexada.' : ''}`,
+      operadorNome: operadorAtivo?.nome || 'Operador',
+      nivel: 'sucesso'
+    });
   };
 
   // Handlers do Módulo 07 (Ronda)
@@ -412,7 +662,19 @@ export default function App() {
     const updated = [...pontosRonda, ponto];
     setPontosRonda(updated);
     mockDb.savePontosRonda(updated);
+
+    handleAddAtividade({
+      condominioId: ponto.condominioId,
+      categoria: 'ronda',
+      moduloOrigem: 'Módulo 07: Rondas',
+      acao: `Novo Ponto de Ronda (${ponto.codigo})`,
+      descricao: `Ponto cadastrado: ${ponto.nome} (${ponto.tipoValidacao}).`,
+      detalhes: `Checklist com ${ponto.perguntas?.length || 0} pergunta(s).`,
+      operadorNome: operadorAtivo?.nome || 'Vigilante',
+      nivel: 'info'
+    });
   };
+
   const handleSalvarExecucaoRonda = (exec: ExecucaoRonda) => {
     const updated = [exec, ...execucoesRonda];
     setExecucoesRonda(updated);
@@ -447,10 +709,30 @@ export default function App() {
       nivel: oco.severidade === 'Crítica' ? 'critico' : 'aviso'
     });
   };
+
   const handleUpdateOcorrencia = (oco: Ocorrencia) => {
+    const anterior = ocorrencias.find((o) => o.id === oco.id);
     const updated = ocorrencias.map((o) => (o.id === oco.id ? oco : o));
     setOcorrencias(updated);
     mockDb.saveOcorrencias(updated);
+
+    const mudouStatus = anterior && anterior.statusOcorrencia !== oco.statusOcorrencia;
+    const acaoTexto = mudouStatus
+      ? `Atualização de Status da Ocorrência ${oco.codigo} (${anterior?.statusOcorrencia || 'Pendente'} → ${oco.statusOcorrencia})`
+      : `Ocorrência Atualizada: ${oco.codigo}`;
+
+    handleAddAtividade({
+      condominioId: oco.condominioId,
+      categoria: 'ocorrencias',
+      moduloOrigem: 'Módulo 08: Livro de Ocorrências',
+      acao: acaoTexto,
+      descricao: `Status: ${oco.statusOcorrencia}. Parecer por: ${oco.resolvidoPor || operadorAtivo?.nome || 'Operador'}.`,
+      detalhes: oco.observacaoResolucao
+        ? `Desfecho: ${oco.observacaoResolucao}`
+        : `Tipo: ${oco.tipo} | Categoria: ${oco.categoria} | Descrição: ${oco.descricao}`,
+      operadorNome: oco.resolvidoPor || operadorAtivo?.nome || 'Operador',
+      nivel: oco.statusOcorrencia === 'Resolvido' ? 'sucesso' : 'aviso'
+    });
   };
 
   // Handlers do Módulo 09 (Passagem de Posto)
@@ -481,11 +763,24 @@ export default function App() {
     const updated = [aut, ...autorizados];
     setAutorizados(updated);
     mockDb.saveAutorizados(updated);
+
+    handleAddAtividade({
+      condominioId: aut.condominioId,
+      categoria: 'autorizados',
+      moduloOrigem: 'Módulo 10: Visitantes & Prestadores',
+      acao: `Nova Autorização de Acesso (${aut.codigo})`,
+      descricao: `${aut.nome} (${aut.tipoAutorizacao}) para unidade ${aut.unidadeResponsavel}.`,
+      detalhes: `Solicitante: ${aut.moradorSolicitanteNome} | Vigência: ${aut.vigenciaTipo}.`,
+      operadorNome: operadorAtivo ? `${operadorAtivo.nome} (${operadorAtivo.cargo})` : 'Porteiro',
+      nivel: 'info'
+    });
   };
+
   const handleRegistrarEntradaAutorizado = (id: string, cracha?: string) => {
+    const aut = autorizados.find((a) => a.id === id);
+    const estaNoCondominio = aut?.statusAcesso === 'Em Visita (No Condomínio)';
     const updated = autorizados.map((a) => {
       if (a.id !== id) return a;
-      const estaNoCondominio = a.statusAcesso === 'Em Visita (No Condomínio)';
       return {
         ...a,
         statusAcesso: estaNoCondominio ? ('Fora do Posto' as const) : ('Em Visita (No Condomínio)' as const),
@@ -496,15 +791,21 @@ export default function App() {
     });
     setAutorizados(updated);
     mockDb.saveAutorizados(updated);
-  };
 
-  // Handlers do Módulo 12 (Histórico de Atividades & Auditoria)
-  const handleAddAtividade = (
-    item: Omit<HistoricoAtividade, 'id' | 'dataHora'> & { dataHora?: string }
-  ) => {
-    const nova = mockDb.registrarAtividade(item);
-    setAtividades(mockDb.getAtividades());
-    return nova;
+    const acaoTexto = estaNoCondominio
+      ? `Saída / Check-out de ${aut?.tipoAutorizacao || 'Visitante'}: ${aut?.nome}`
+      : `Entrada / Check-in de ${aut?.tipoAutorizacao || 'Visitante'}: ${aut?.nome}`;
+
+    handleAddAtividade({
+      condominioId: aut?.condominioId || condominioAtivo.id,
+      categoria: 'autorizados',
+      moduloOrigem: 'Módulo 10: Visitantes & Prestadores',
+      acao: acaoTexto,
+      descricao: `Acesso à unidade ${aut?.unidadeResponsavel || '-'}. Crachá: ${cracha || aut?.crachaAtual || 'Não informado'}.`,
+      detalhes: estaNoCondominio ? 'Saída registrada e crachá devolvido.' : `Entrada autorizada pelo morador ${aut?.moradorSolicitanteNome || '-'}.`,
+      operadorNome: operadorAtivo ? `${operadorAtivo.nome} (${operadorAtivo.cargo})` : 'Porteiro',
+      nivel: estaNoCondominio ? 'info' : 'sucesso'
+    });
   };
 
   // Autenticação e Consulta de Permissões RBAC & Postos Autorizados
@@ -1177,11 +1478,33 @@ export default function App() {
         condominiosDisponiveis={postosAutorizadosOperador}
         onSelectCondominio={(condId) => {
           const c = condominios.find((item) => item.id === condId);
-          if (c) setCondominioAtivo(c);
+          if (c && c.id !== condominioAtivo.id) {
+            setCondominioAtivo(c);
+            handleAddAtividade({
+              condominioId: c.id,
+              categoria: 'login',
+              moduloOrigem: 'Módulo 01: Navegação',
+              acao: 'Alternância de Posto de Trabalho',
+              descricao: `Operador alternou para a guarita do posto "${c.nome}".`,
+              detalhes: `Código: ${c.codigo} | Estrutura: ${c.tipoEstrutura || 'Blocos'}.`,
+              operadorNome: `${operadorAtivo.nome} (${operadorAtivo.cargo})`,
+              nivel: 'info'
+            });
+          }
         }}
         moduloAtivo={moduloAtivo}
         onSelectModulo={(modId) => setModuloAtivo(modId)}
         onLogout={() => {
+          handleAddAtividade({
+            condominioId: condominioAtivo.id,
+            categoria: 'login',
+            moduloOrigem: 'Módulo 01: Autenticação',
+            acao: 'Encerramento de Sessão do Operador',
+            descricao: `Operador ${operadorAtivo.nome} finalizou sua sessão no posto.`,
+            operadorId: operadorAtivo.id,
+            operadorNome: `${operadorAtivo.nome} (${operadorAtivo.cargo})`,
+            nivel: 'info'
+          });
           setOperadorAtivo(null);
           setLoginLogin('');
           setLoginPin('');
@@ -1225,7 +1548,19 @@ export default function App() {
                   <button
                     key={c.id}
                     onClick={() => {
-                      setCondominioAtivo(c);
+                      if (c.id !== condominioAtivo.id) {
+                        setCondominioAtivo(c);
+                        handleAddAtividade({
+                          condominioId: c.id,
+                          categoria: 'login',
+                          moduloOrigem: 'Módulo 01: Navegação',
+                          acao: 'Alternância de Posto de Trabalho',
+                          descricao: `Operador alternou para a guarita do posto "${c.nome}".`,
+                          detalhes: `Código: ${c.codigo} | Estrutura: ${c.tipoEstrutura || 'Blocos'}.`,
+                          operadorNome: `${operadorAtivo.nome} (${operadorAtivo.cargo})`,
+                          nivel: 'info'
+                        });
+                      }
                       setModalTrocaCondominioAberto(false);
                     }}
                     className={`w-full p-3 rounded-xl text-left border flex items-center justify-between transition-all ${

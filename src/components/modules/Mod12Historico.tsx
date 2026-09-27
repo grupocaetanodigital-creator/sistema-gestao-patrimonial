@@ -72,18 +72,27 @@ export const Mod12Historico: React.FC<Mod12HistoricoProps> = ({
   const [novaDescricao, setNovaDescricao] = useState('');
   const [novosDetalhes, setNovosDetalhes] = useState('');
   const [novoNivel, setNovoNivel] = useState<NivelAtividade>('info');
+  const [feedbackMsg, setFeedbackMsg] = useState('');
+  const [erroModal, setErroModal] = useState('');
 
-  // Parser de data flexível (ISO ou pt-BR)
+  // Parser de data flexível (ISO ou pt-BR com suporte a hora, minuto e segundo)
   const parseData = (dataStr: string): Date | null => {
     if (!dataStr) return null;
     if (dataStr.includes('T') || dataStr.match(/^\d{4}-\d{2}-\d{2}/)) {
       const parsed = new Date(dataStr);
       if (!isNaN(parsed.getTime())) return parsed;
     }
-    const match = dataStr.match(/(\d{2})\/(\d{2})\/(\d{4})/);
+    const match = dataStr.match(/(\d{2})\/(\d{2})\/(\d{4})(?:[,\s]+(\d{2}):(\d{2})(?::(\d{2}))?)?/);
     if (match) {
-      const [, dia, mes, ano] = match;
-      return new Date(Number(ano), Number(mes) - 1, Number(dia));
+      const [, dia, mes, ano, hora, min, seg] = match;
+      return new Date(
+        Number(ano),
+        Number(mes) - 1,
+        Number(dia),
+        hora ? Number(hora) : 0,
+        min ? Number(min) : 0,
+        seg ? Number(seg) : 0
+      );
     }
     const fallback = new Date(dataStr);
     return isNaN(fallback.getTime()) ? null : fallback;
@@ -258,7 +267,8 @@ export const Mod12Historico: React.FC<Mod12HistoricoProps> = ({
   // Exportar histórico filtrado para CSV (compatível com Excel)
   const handleExportarCsv = () => {
     if (atividadesFiltradas.length === 0) {
-      alert('Nenhuma atividade disponível para exportação com os filtros atuais.');
+      setFeedbackMsg('Nenhuma atividade disponível para exportação com os filtros atuais.');
+      setTimeout(() => setFeedbackMsg(''), 4000);
       return;
     }
 
@@ -307,15 +317,18 @@ export const Mod12Historico: React.FC<Mod12HistoricoProps> = ({
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
+    setFeedbackMsg(`✓ Histórico exportado com sucesso (${atividadesFiltradas.length} registro(s) baixados em CSV).`);
+    setTimeout(() => setFeedbackMsg(''), 4000);
   };
 
   // Salvar Nova Anotação Manual
   const handleSalvarNovaAnotacao = (e: React.FormEvent) => {
     e.preventDefault();
     if (!novaAcao.trim() || !novaDescricao.trim()) {
-      alert('Por favor, preencha o título e a descrição do evento.');
+      setErroModal('Por favor, preencha o título e a descrição do evento.');
       return;
     }
+    setErroModal('');
 
     onAddAtividade({
       condominioId: condominioAtivo.id,
@@ -335,6 +348,8 @@ export const Mod12Historico: React.FC<Mod12HistoricoProps> = ({
     setNovosDetalhes('');
     setNovoNivel('info');
     setNovaCategoria('geral');
+    setFeedbackMsg('✓ Nova anotação operacional gravada e auditada com sucesso.');
+    setTimeout(() => setFeedbackMsg(''), 4000);
   };
 
   return (
@@ -379,6 +394,19 @@ export const Mod12Historico: React.FC<Mod12HistoricoProps> = ({
           </button>
         </div>
       </div>
+
+      {feedbackMsg && (
+        <div className="p-3 bg-emerald-950/80 border border-emerald-500/50 rounded-xl text-emerald-300 text-xs font-semibold flex items-center justify-between animate-in fade-in">
+          <span>{feedbackMsg}</span>
+          <button
+            type="button"
+            onClick={() => setFeedbackMsg('')}
+            className="text-emerald-400 hover:text-white text-xs font-bold"
+          >
+            ✕
+          </button>
+        </div>
+      )}
 
       {/* QUADRO DE RESUMO ESTATÍSTICO */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
@@ -633,6 +661,12 @@ export const Mod12Historico: React.FC<Mod12HistoricoProps> = ({
 
             {/* Formulário */}
             <form onSubmit={handleSalvarNovaAnotacao} className="p-4 space-y-3 text-xs">
+              {erroModal && (
+                <div className="p-2.5 bg-rose-950/80 border border-rose-500/50 rounded-xl text-rose-300 text-xs font-semibold">
+                  {erroModal}
+                </div>
+              )}
+
               <div className="grid grid-cols-2 gap-2">
                 <div>
                   <label className="block text-[11px] font-bold text-slate-300 mb-1">Categoria *</label>

@@ -559,33 +559,53 @@ export const Mod01Cadastros: React.FC<Mod01CadastrosProps> = ({
   const isOperadorVinculadoAoPosto = (op: Operador, cond: Condominio): boolean => {
     if (!op || !cond) return false;
 
-    // 1. Cargo Master ou login admin possui acesso global irrestrito
-    if (op.cargo === 'Desenvolvedor Master' || op.login === 'admin' || op.role === 'master') {
+    // Normalização segura e uniforme da lista de condomínios autorizados do operador
+    const rawLista: any = op.condominiosAutorizados ?? (op as any).condominios_autorizados ?? [];
+    let lista: string[] = [];
+
+    if (Array.isArray(rawLista)) {
+      lista = rawLista.map((item) =>
+        typeof item === 'object' && item !== null ? String(item.id || item.codigo || '') : String(item)
+      );
+    } else if (typeof rawLista === 'string') {
+      try {
+        const parsed = JSON.parse(rawLista);
+        if (Array.isArray(parsed)) {
+          lista = parsed.map((item) =>
+            typeof item === 'object' && item !== null ? String(item.id || item.codigo || '') : String(item)
+          );
+        } else {
+          lista = rawLista.split(',').map((s: string) => s.trim());
+        }
+      } catch {
+        lista = rawLista.split(',').map((s: string) => s.trim());
+      }
+    }
+
+    // 1. Autorização global explícita para TODOS os postos
+    const temAcessoGlobal = lista.some((item) => {
+      const lower = String(item).toLowerCase().trim();
+      return lower === 'todos' || lower === '*' || lower === 'all';
+    });
+    if (temAcessoGlobal) {
       return true;
     }
 
-    // 2. Supervisor ou Operador com autorização global declarada 'TODOS'
-    const lista = Array.isArray(op.condominiosAutorizados)
-      ? op.condominiosAutorizados
-      : typeof (op as any).condominiosAutorizados === 'string'
-      ? (op as any).condominiosAutorizados.split(',').map((s: string) => s.trim())
-      : Array.isArray((op as any).condominios_autorizados)
-      ? (op as any).condominios_autorizados
-      : [];
-
-    if (lista.includes('TODOS') || lista.includes('todos')) {
+    // 2. Vínculo direto por propriedade condominioId no operador (se houver)
+    const directId = (op as any).condominioId || (op as any).condominio_id;
+    if (directId && String(directId).toLowerCase().trim() === String(cond.id).toLowerCase().trim()) {
       return true;
     }
 
-    // 3. Vínculo direto por ID, código ou nome
-    const cId = cond.id.toLowerCase().trim();
+    // 3. Vínculo explícito por ID, Código ou Nome do condomínio ativo
+    const cId = (cond.id || '').toLowerCase().trim();
     const cCod = (cond.codigo || '').toLowerCase().trim();
     const cNome = (cond.nome || '').toLowerCase().trim();
 
-    return lista.some((item: any) => {
+    return lista.some((item) => {
       if (!item) return false;
       const str = String(item).toLowerCase().trim();
-      return str === cId || str === cCod || str === cNome;
+      return str === cId || (cCod && str === cCod) || (cNome && str === cNome);
     });
   };
 
@@ -594,7 +614,7 @@ export const Mod01Cadastros: React.FC<Mod01CadastrosProps> = ({
 
   // Filtragem: por posto ativo (padrão) e por busca textual
   const operadoresDoCondominio = operadores.filter((o) => {
-    // 1. Filtro por Posto / Condomínio Ativo (padrão: somente operadores vinculados a este condomínio)
+    // 1. Filtro por Posto / Condomínio Ativo (somente operadores vinculados a este condomínio)
     if (filtroPostoOperador === 'ativo') {
       if (!isOperadorVinculadoAoPosto(o, condominioAtivo)) {
         return false;
@@ -608,7 +628,8 @@ export const Mod01Cadastros: React.FC<Mod01CadastrosProps> = ({
       const matchLogin = (o.login || '').toLowerCase().includes(q);
       const matchCargo = (o.cargo || '').toLowerCase().includes(q);
       const matchCodigo = (o.codigo || '').toLowerCase().includes(q);
-      return matchNome || matchLogin || matchCargo || matchCodigo;
+      const matchRole = (o.role || '').toLowerCase().includes(q);
+      return matchNome || matchLogin || matchCargo || matchCodigo || matchRole;
     }
 
     return true;
@@ -1301,11 +1322,24 @@ export const Mod01Cadastros: React.FC<Mod01CadastrosProps> = ({
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             {operadoresDoCondominio.map((op) => {
-              const isMaster = op.cargo === 'Desenvolvedor Master' || op.login === 'admin';
-              const isSupervisorTodos = op.condominiosAutorizados?.includes('TODOS');
-              const postosVinculados = isMaster || isSupervisorTodos
+              const rawLista = Array.isArray(op.condominiosAutorizados)
+                ? op.condominiosAutorizados
+                : typeof (op as any).condominiosAutorizados === 'string'
+                ? [(op as any).condominiosAutorizados]
+                : [];
+              const isSupervisorTodos = rawLista.some((x) => String(x).toUpperCase().trim() === 'TODOS');
+              const postosVinculados = isSupervisorTodos
                 ? condominios
-                : condominios.filter((c) => op.condominiosAutorizados?.includes(c.id));
+                : condominios.filter((c) =>
+                    rawLista.some((item) => {
+                      const str = String(item).toLowerCase().trim();
+                      return (
+                        str === c.id.toLowerCase() ||
+                        str === (c.codigo || '').toLowerCase() ||
+                        str === (c.nome || '').toLowerCase()
+                      );
+                    })
+                  );
 
               return (
                 <div
@@ -1330,9 +1364,9 @@ export const Mod01Cadastros: React.FC<Mod01CadastrosProps> = ({
                       <h3 className="text-sm font-bold text-white">{op.nome}</h3>
                       <div className="flex items-center gap-2 mt-0.5">
                         <span className={`text-[10px] px-2 py-0.5 rounded font-bold border ${
-                          isMaster
+                          op.cargo === 'Desenvolvedor Master' || op.role === 'master'
                             ? 'bg-amber-950/60 text-amber-300 border-amber-500/30'
-                            : op.cargo.includes('Supervisor')
+                            : op.cargo.includes('Supervisor') || op.cargo.includes('Diretor')
                             ? 'bg-purple-950/60 text-purple-300 border-purple-500/30'
                             : 'bg-emerald-950/60 text-emerald-300 border-emerald-500/30'
                         }`}>
@@ -1353,22 +1387,16 @@ export const Mod01Cadastros: React.FC<Mod01CadastrosProps> = ({
                       <span className="font-semibold text-slate-300 flex items-center gap-1">
                         <Building2 className="w-3 h-3 text-emerald-400" /> Postos Autorizados:
                       </span>
-                      {isMaster ? (
-                        <span className="font-mono text-[10px] text-amber-400 font-bold">Acesso Total</span>
-                      ) : isSupervisorTodos ? (
-                        <span className="font-mono text-[10px] text-purple-400 font-bold">Todos</span>
+                      {isSupervisorTodos ? (
+                        <span className="font-mono text-[10px] text-purple-400 font-bold">Todos os Postos</span>
                       ) : (
                         <span className="font-mono text-[10px] text-emerald-400 font-bold">
-                          {postosVinculados.length} de 3
+                          {postosVinculados.length} posto(s)
                         </span>
                       )}
                     </div>
 
-                    {isMaster ? (
-                      <div className="text-[10px] text-amber-300 bg-amber-950/40 border border-amber-500/20 px-2 py-1 rounded">
-                        🌐 Acesso Total a Todos os Postos (Master)
-                      </div>
-                    ) : isSupervisorTodos ? (
+                    {isSupervisorTodos ? (
                       <div className="text-[10px] text-purple-300 bg-purple-950/40 border border-purple-500/20 px-2 py-1 rounded">
                         🌐 Supervisão Global de Todos os Postos
                       </div>
@@ -1380,11 +1408,11 @@ export const Mod01Cadastros: React.FC<Mod01CadastrosProps> = ({
                               key={c.id}
                               className={`text-[10px] px-2 py-0.5 rounded border font-medium ${
                                 c.id === condominioAtivo.id
-                                  ? 'bg-emerald-950/60 text-emerald-300 border-emerald-500/40 font-bold'
+                                  ? 'bg-emerald-950/60 text-emerald-300 border-emerald-500/40 font-bold ring-1 ring-emerald-500/50'
                                   : 'bg-slate-800 text-slate-300 border-slate-700'
                               }`}
                             >
-                              🏢 {c.nome}
+                              🏢 {c.nome} {c.id === condominioAtivo.id && '✓ (Este Posto)'}
                             </span>
                           ))
                         ) : (
