@@ -1106,10 +1106,10 @@ export async function uploadPhotoToSupabase(
  */
 export async function pushAtividadeToSupabase(a: any): Promise<void> {
   const client = getSupabaseClient();
-  if (!client) return;
+  if (!client || !a || !a.condominioId) return;
 
   try {
-    await client.from('historico_atividades').upsert(
+    const { error } = await client.from('historico_atividades').upsert(
       {
         id: a.id,
         condominio_id: a.condominioId,
@@ -1127,8 +1127,11 @@ export async function pushAtividadeToSupabase(a: any): Promise<void> {
       },
       { onConflict: 'id' }
     );
+    if (error) {
+      console.warn('Erro ao sincronizar atividade imediatamente com Supabase:', error.message);
+    }
   } catch (err) {
-    console.warn('Erro ao sincronizar atividade imediatamente com Supabase:', err);
+    console.warn('Exceção ao enviar atividade para Supabase:', err);
   }
 }
 

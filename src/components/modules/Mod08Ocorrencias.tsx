@@ -132,10 +132,14 @@ Data/Hora: ${nova.dataHora}`;
     e.preventDefault();
     if (!modalResolucao || !onUpdateOcorrencia) return;
 
+    const notaFinal = obsResolucao.trim()
+      ? obsResolucao.trim()
+      : `Status atualizado para "${statusEdicao}" por ${operadorAtivo.nome}.`;
+
     const atualizada: Ocorrencia = {
       ...modalResolucao,
       statusOcorrencia: statusEdicao,
-      observacaoResolucao: obsResolucao,
+      observacaoResolucao: notaFinal,
       resolvidoPor: operadorAtivo.nome,
       dataResolucao: new Date().toLocaleString('pt-BR')
     };
@@ -488,33 +492,44 @@ Data/Hora: ${nova.dataHora}`;
 
             <form onSubmit={handleSalvarResolucao} className="space-y-3">
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">
+                <label className="block text-xs font-semibold text-slate-300 mb-1.5">
                   Novo Status da Ocorrência *
                 </label>
-                <select
-                  value={statusEdicao}
-                  onChange={(e) => setStatusEdicao(e.target.value as Ocorrencia['statusOcorrencia'])}
-                  className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-xs text-white font-bold focus:outline-none focus:border-emerald-500"
-                >
-                  <option value="Pendente">🟡 Pendente (Aguardando Análise)</option>
-                  <option value="Em Análise">🔵 Em Análise pelo Síndico / Gestor</option>
-                  <option value="Visto">🟣 Visto / Ciente da Administração</option>
-                  <option value="Resolvido">🟢 Resolvido / Concluído</option>
-                </select>
+                <div className="grid grid-cols-2 gap-2 mb-2">
+                  {[
+                    { id: 'Pendente', label: '🟡 Pendente', cor: 'border-amber-500/40 bg-amber-500/10 text-amber-300' },
+                    { id: 'Em Análise', label: '🔵 Em Análise', cor: 'border-blue-500/40 bg-blue-500/10 text-blue-300' },
+                    { id: 'Visto', label: '🟣 Visto / Ciente', cor: 'border-purple-500/40 bg-purple-500/10 text-purple-300' },
+                    { id: 'Resolvido', label: '🟢 Resolvido', cor: 'border-emerald-500/40 bg-emerald-500/10 text-emerald-300' }
+                  ].map((s) => (
+                    <button
+                      key={s.id}
+                      type="button"
+                      onClick={() => setStatusEdicao(s.id as Ocorrencia['statusOcorrencia'])}
+                      className={`px-2.5 py-1.5 rounded-lg border text-xs font-bold transition-all text-center ${
+                        statusEdicao === s.id ? `${s.cor} ring-1 ring-white/20` : 'border-slate-800 bg-slate-850 text-slate-400 hover:text-slate-200'
+                      }`}
+                    >
+                      {s.label}
+                    </button>
+                  ))}
+                </div>
               </div>
 
               <div>
                 <label className="block text-xs font-semibold text-slate-300 mb-1">
-                  Observação da Resolução / Parecer do Supervisor *
+                  Parecer do Supervisor / Observação da Resolução <span className="text-slate-500 font-normal">(Opcional)</span>
                 </label>
                 <textarea
-                  required
                   rows={3}
-                  placeholder="Ex: Morador foi notificado formalmente por advertência regimental. O som foi cessado às 23:45..."
+                  placeholder="Ex: Situação resolvida com advertência, morador ciente e providências acatadas..."
                   value={obsResolucao}
                   onChange={(e) => setObsResolucao(e.target.value)}
                   className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-xs text-white focus:outline-none focus:border-emerald-500"
                 />
+                <p className="text-[10px] text-slate-500 mt-1">
+                  Se não preenchido, será registrado automaticamente a mudança de status por {operadorAtivo.nome}.
+                </p>
               </div>
 
               <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-800">

@@ -237,6 +237,57 @@ export default function App() {
     return nova;
   };
 
+  const handleRefreshAllData = () => {
+    const freshConds = mockDb.getCondominios();
+    const freshOps = mockDb.getOperadores();
+    const freshAtiv = mockDb.getAtividades();
+    setCondominios(freshConds);
+    setOperadores(freshOps);
+    setMoradores(mockDb.getMoradores());
+    setEntregadores(mockDb.getEntregadores());
+    setLotes(mockDb.getLotes());
+    setItensEncomenda(mockDb.getItensEncomenda());
+    setCustodias(mockDb.getCustodias());
+    setMateriais(mockDb.getMateriais());
+    setChaves(mockDb.getChaves());
+    setChamados(mockDb.getChamados());
+    setChecklistsConfig(mockDb.getChecklistConfig());
+    setPontosRonda(mockDb.getPontosRonda());
+    setExecucoesRonda(mockDb.getExecucoesRonda());
+    setOcorrencias(mockDb.getOcorrencias());
+    setPassagens(mockDb.getPassagens());
+    setAutorizados(mockDb.getAutorizados());
+    setAtividades(freshAtiv);
+
+    if (condominioAtivo) {
+      const condAtual = freshConds.find((c) => c.id === condominioAtivo.id);
+      if (condAtual) setCondominioAtivo(condAtual);
+    }
+    if (operadorAtivo) {
+      const opAtual = freshOps.find((o) => o.id === operadorAtivo.id);
+      if (opAtual) setOperadorAtivo(opAtual);
+    }
+  };
+
+  const handleLogout = () => {
+    if (operadorAtivo) {
+      handleAddAtividade({
+        condominioId: condominioAtivo.id,
+        categoria: 'login',
+        moduloOrigem: 'Módulo 01: Autenticação',
+        acao: 'Encerramento de Sessão do Operador',
+        descricao: `Operador ${operadorAtivo.nome} finalizou sua sessão no posto.`,
+        detalhes: `Cargo: ${operadorAtivo.cargo} | Login: ${operadorAtivo.login}.`,
+        operadorId: operadorAtivo.id,
+        operadorNome: `${operadorAtivo.nome} (${operadorAtivo.cargo})`,
+        nivel: 'info'
+      });
+    }
+    setOperadorAtivo(null);
+    setLoginLogin('');
+    setLoginPin('');
+  };
+
   // Handlers do Módulo 01 (Cadastros & Postos)
   const handleAddCondominio = (cond: Condominio) => {
     const updated = [...condominios, cond];
@@ -654,6 +705,20 @@ export default function App() {
       detalhes: `Solução executada: ${solucao}.${fotoDepois ? ' Foto do resultado anexada.' : ''}`,
       operadorNome: operadorAtivo?.nome || 'Operador',
       nivel: 'sucesso'
+    });
+  };
+
+  const handleUpdateChecklistConfig = (configs: ItemChecklistConfig[]) => {
+    setChecklistsConfig(configs);
+    mockDb.saveChecklistConfig(configs);
+    handleAddAtividade({
+      condominioId: condominioAtivo.id,
+      categoria: 'manutencao',
+      moduloOrigem: 'Módulo 06: Manutenção Predial',
+      acao: 'Checklist Preventivo de Manutenção Atualizado',
+      descricao: `${configs.length} itens no roteiro de checagem do posto.`,
+      operadorNome: operadorAtivo ? `${operadorAtivo.nome} (${operadorAtivo.cargo})` : 'Operador',
+      nivel: 'info'
     });
   };
 
@@ -1182,11 +1247,7 @@ export default function App() {
         operadorAtivo={operadorAtivo}
         podeTrocarCondominio={postosAutorizadosOperador.length > 1}
         onTrocarCondominio={() => setModalTrocaCondominioAberto(true)}
-        onLogout={() => {
-          setOperadorAtivo(null);
-          setLoginLogin('');
-          setLoginPin('');
-        }}
+        onLogout={handleLogout}
         onAbrirEmergencia={() => setModalEmergenciaAberto(true)}
         onAbrirMenuDrawer={() => setDrawerAberto(true)}
       />
@@ -1258,6 +1319,7 @@ export default function App() {
             onUpdateOperador={handleUpdateOperador}
             onAddMorador={handleAddMorador}
             onUpdateMorador={handleUpdateMorador}
+            onRefreshData={handleRefreshAllData}
           />
         )}
 
@@ -1317,7 +1379,7 @@ export default function App() {
             checklistsConfig={checklistsConfig}
             onAddChamado={handleAddChamado}
             onConcluirChamado={handleConcluirChamado}
-            onUpdateChecklistConfig={setChecklistsConfig}
+            onUpdateChecklistConfig={handleUpdateChecklistConfig}
           />
         )}
 
@@ -1494,21 +1556,7 @@ export default function App() {
         }}
         moduloAtivo={moduloAtivo}
         onSelectModulo={(modId) => setModuloAtivo(modId)}
-        onLogout={() => {
-          handleAddAtividade({
-            condominioId: condominioAtivo.id,
-            categoria: 'login',
-            moduloOrigem: 'Módulo 01: Autenticação',
-            acao: 'Encerramento de Sessão do Operador',
-            descricao: `Operador ${operadorAtivo.nome} finalizou sua sessão no posto.`,
-            operadorId: operadorAtivo.id,
-            operadorNome: `${operadorAtivo.nome} (${operadorAtivo.cargo})`,
-            nivel: 'info'
-          });
-          setOperadorAtivo(null);
-          setLoginLogin('');
-          setLoginPin('');
-        }}
+        onLogout={handleLogout}
       />
 
       {/* MODAL DE EMERGÊNCIA (POLÍCIA, SAMU, BOMBEIROS, SÍNDICO, SUPERVISOR) */}

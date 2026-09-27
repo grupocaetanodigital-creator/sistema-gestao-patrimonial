@@ -46,6 +46,7 @@ interface Mod01CadastrosProps {
   onUpdateOperador: (op: Operador) => void;
   onAddMorador: (morador: Morador) => void;
   onUpdateMorador: (morador: Morador) => void;
+  onRefreshData?: () => void;
 }
 
 export const Mod01Cadastros: React.FC<Mod01CadastrosProps> = ({
@@ -59,7 +60,8 @@ export const Mod01Cadastros: React.FC<Mod01CadastrosProps> = ({
   onAddOperador,
   onUpdateOperador,
   onAddMorador,
-  onUpdateMorador
+  onUpdateMorador,
+  onRefreshData
 }) => {
   const cargoLower = operadorAtivo.cargo?.toLowerCase() || '';
 
@@ -2070,7 +2072,7 @@ export const Mod01Cadastros: React.FC<Mod01CadastrosProps> = ({
 
       {/* ==================== ABA 7: SUPABASE CLOUD (POSTGRESQL) ==================== */}
       {tabAtiva === 'supabase' && isMasterDev && (
-        <SupabaseTab />
+        <SupabaseTab onRefreshData={onRefreshData} />
       )}
 
       {/* ==================== MODAL CRIAR CONDOMÍNIO ==================== */}
