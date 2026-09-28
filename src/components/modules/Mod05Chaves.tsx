@@ -320,13 +320,14 @@ export const Mod05Chaves: React.FC<Mod05ChavesProps> = ({
                   </label>
                   <input
                     type="text"
+                    inputMode="numeric"
                     placeholder="Ex: 102 ou 304..."
                     value={unidadeFiltro}
                     onChange={(e) => {
                       setUnidadeFiltro(e.target.value);
                       setMoradorSel(null);
                     }}
-                    className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-xs text-white focus:outline-none focus:border-amber-500"
+                    className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-xs text-white focus:outline-none focus:border-amber-500 font-bold"
                   />
 
                   {unidadeFiltro.length >= 2 && !moradorSel && (

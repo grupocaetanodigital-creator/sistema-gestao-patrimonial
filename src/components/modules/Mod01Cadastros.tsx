@@ -827,6 +827,7 @@ export const Mod01Cadastros: React.FC<Mod01CadastrosProps> = ({
                 <label className="block text-xs font-semibold text-slate-300 mb-1">CNPJ *</label>
                 <input
                   type="text"
+                  inputMode="numeric"
                   required
                   value={condCnpj}
                   onChange={(e) => setCondCnpj(e.target.value)}
@@ -837,7 +838,8 @@ export const Mod01Cadastros: React.FC<Mod01CadastrosProps> = ({
               <div>
                 <label className="block text-xs font-semibold text-slate-300 mb-1">Telefone da Portaria *</label>
                 <input
-                  type="text"
+                  type="tel"
+                  inputMode="tel"
                   required
                   value={condTelPortaria}
                   onChange={(e) => setCondTelPortaria(e.target.value)}
@@ -870,7 +872,8 @@ export const Mod01Cadastros: React.FC<Mod01CadastrosProps> = ({
               <div>
                 <label className="block text-xs font-semibold text-slate-300 mb-1">WhatsApp do Síndico (Dossiês & Alertas) *</label>
                 <input
-                  type="text"
+                  type="tel"
+                  inputMode="tel"
                   required
                   value={condTelSindico}
                   onChange={(e) => setCondTelSindico(e.target.value)}
@@ -882,6 +885,7 @@ export const Mod01Cadastros: React.FC<Mod01CadastrosProps> = ({
                 <label className="block text-xs font-semibold text-slate-300 mb-1">Intervalo de Ronda (min)</label>
                 <input
                   type="number"
+                  inputMode="numeric"
                   value={condIntervaloRonda}
                   onChange={(e) => setCondIntervaloRonda(Number(e.target.value))}
                   className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-xs text-white font-mono focus:outline-none focus:border-emerald-500"
@@ -916,6 +920,7 @@ export const Mod01Cadastros: React.FC<Mod01CadastrosProps> = ({
                   </label>
                   <input
                     type="number"
+                    inputMode="numeric"
                     value={condQtdBlocos}
                     onChange={(e) => setCondQtdBlocos(Number(e.target.value))}
                     className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-xs text-white font-mono focus:outline-none focus:border-emerald-500"
@@ -928,6 +933,7 @@ export const Mod01Cadastros: React.FC<Mod01CadastrosProps> = ({
                   </label>
                   <input
                     type="number"
+                    inputMode="numeric"
                     value={condUnidadesPorBloco}
                     onChange={(e) => setCondUnidadesPorBloco(Number(e.target.value))}
                     className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-xs text-white font-mono focus:outline-none focus:border-emerald-500"
@@ -2116,6 +2122,7 @@ export const Mod01Cadastros: React.FC<Mod01CadastrosProps> = ({
                   <label className="block text-xs font-semibold text-slate-300 mb-1">CNPJ *</label>
                   <input
                     type="text"
+                    inputMode="numeric"
                     required
                     placeholder="12.345.678/0001-99"
                     value={novoCondCnpj}
@@ -2126,7 +2133,8 @@ export const Mod01Cadastros: React.FC<Mod01CadastrosProps> = ({
                 <div>
                   <label className="block text-xs font-semibold text-slate-300 mb-1">Telefone Posto *</label>
                   <input
-                    type="text"
+                    type="tel"
+                    inputMode="tel"
                     required
                     placeholder="11940609960"
                     value={novoCondTelPortaria}
@@ -2163,7 +2171,8 @@ export const Mod01Cadastros: React.FC<Mod01CadastrosProps> = ({
                 <div>
                   <label className="block text-xs font-semibold text-slate-300 mb-1">WhatsApp Síndico *</label>
                   <input
-                    type="text"
+                    type="tel"
+                    inputMode="tel"
                     required
                     placeholder="11940609960"
                     value={novoCondTelSindico}
@@ -2256,7 +2265,8 @@ export const Mod01Cadastros: React.FC<Mod01CadastrosProps> = ({
                 <div>
                   <label className="block text-xs font-semibold text-slate-300 mb-1">Senha / PIN *</label>
                   <input
-                    type="text"
+                    type="password"
+                    inputMode="numeric"
                     required
                     placeholder="Ex: 1234"
                     value={opPin}
@@ -2426,6 +2436,7 @@ export const Mod01Cadastros: React.FC<Mod01CadastrosProps> = ({
                   </label>
                   <input
                     type="text"
+                    inputMode="numeric"
                     required
                     placeholder="Ex: 102 ou 54"
                     value={moradorUnidade}
@@ -2451,7 +2462,8 @@ export const Mod01Cadastros: React.FC<Mod01CadastrosProps> = ({
                 <div>
                   <label className="block text-xs font-semibold text-slate-300 mb-1">WhatsApp (com DDD) *</label>
                   <input
-                    type="text"
+                    type="tel"
+                    inputMode="tel"
                     required
                     placeholder="11940609960"
                     value={moradorWhatsapp}

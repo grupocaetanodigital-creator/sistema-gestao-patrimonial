@@ -521,6 +521,7 @@ Status: ${novaPassagem.status}`;
                 </label>
                 <input
                   type="password"
+                  inputMode="numeric"
                   required
                   placeholder="PIN sainte..."
                   value={pinSainte}
@@ -535,6 +536,7 @@ Status: ${novaPassagem.status}`;
                 </label>
                 <input
                   type="password"
+                  inputMode="numeric"
                   required
                   placeholder="PIN entrante..."
                   value={pinEntrante}

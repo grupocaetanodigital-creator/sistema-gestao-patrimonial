@@ -1225,10 +1225,11 @@ Emitido por: ${operadorAtivo.nome} em ${new Date().toLocaleString('pt-BR')}`;
                 <User className="w-4 h-4 text-emerald-400 absolute left-3 top-1/2 -translate-y-1/2" />
                 <input
                   type="text"
+                  inputMode="numeric"
                   placeholder="Filtrar por CPF (Morador ou Retirante)..."
                   value={filtroCpf}
                   onChange={(e) => setFiltroCpf(e.target.value)}
-                  className="w-full pl-9 pr-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-xs text-white placeholder-slate-400 focus:outline-none focus:border-emerald-500"
+                  className="w-full pl-9 pr-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-xs text-white placeholder-slate-400 focus:outline-none focus:border-emerald-500 font-mono"
                 />
                 {filtroCpf && (
                   <button

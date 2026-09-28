@@ -390,6 +390,7 @@ Data/Hora: ${nova.dataHora}`;
                     <label className="block text-xs font-semibold text-slate-300 mb-1">Unidade Infratora *</label>
                     <input
                       type="text"
+                      inputMode="numeric"
                       required
                       placeholder="Ex: Bloco A - Apto 204"
                       value={unidadeInfratora}
@@ -401,6 +402,7 @@ Data/Hora: ${nova.dataHora}`;
                     <label className="block text-xs font-semibold text-slate-300 mb-1">Unidade Reclamante</label>
                     <input
                       type="text"
+                      inputMode="numeric"
                       placeholder="Ex: Bloco A - Apto 304"
                       value={unidadeReclamante}
                       onChange={(e) => setUnidadeReclamante(e.target.value)}

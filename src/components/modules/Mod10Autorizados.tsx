@@ -258,13 +258,14 @@ Horário: ${new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2
                 </label>
                 <input
                   type="text"
+                  inputMode="numeric"
                   placeholder="Digite número da unidade (ex: 102 ou 304)..."
                   value={unidadeFiltro}
                   onChange={(e) => {
                     setUnidadeFiltro(e.target.value);
                     setMoradorSel(null);
                   }}
-                  className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-xs text-white focus:outline-none focus:border-teal-500"
+                  className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-xs text-white focus:outline-none focus:border-teal-500 font-bold"
                 />
 
                 {unidadeFiltro.length >= 2 && !moradorSel && (

@@ -262,6 +262,7 @@ Foto da Avaria: ${fotoFinal}`;
                   <label className="block text-xs font-semibold text-slate-300 mb-1">Quantidade</label>
                   <input
                     type="number"
+                    inputMode="numeric"
                     min={1}
                     value={quantidade}
                     onChange={(e) => setQuantidade(Number(e.target.value))}

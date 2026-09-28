@@ -117,6 +117,7 @@ export const Mod02Encomendas: React.FC<Mod02EncomendasProps> = ({
   const [codigoRastreio, setCodigoRastreio] = useState('');
   const [observacaoAvaria, setObservacaoAvaria] = useState('');
   const [fotoEtiquetaUrl, setFotoEtiquetaUrl] = useState('');
+  const [qtdVolumesPacote, setQtdVolumesPacote] = useState<number>(1);
   const [alertaAgrupamento, setAlertaAgrupamento] = useState<{
     count: number;
     unidade: string;
@@ -408,9 +409,9 @@ export const Mod02Encomendas: React.FC<Mod02EncomendasProps> = ({
     }
   };
 
-  // 2ª ETAPA: Salvar Pacote Triado
-  const handleSalvarPacote = (e: React.FormEvent) => {
-    e.preventDefault();
+  // 2ª ETAPA: Salvar Pacote Triado (com suporte a multi-volumes e continuação na mesma unidade)
+  const handleSalvarPacote = (e?: React.FormEvent, continuarMesmaUnidade: boolean = false) => {
+    if (e) e.preventDefault();
     const nomeDestinatario = moradorSelecionado
       ? moradorSelecionado.nomeCompleto
       : moradorAvulsoNome.trim();
@@ -434,58 +435,78 @@ export const Mod02Encomendas: React.FC<Mod02EncomendasProps> = ({
 
     const loteAtual = lotes.find((l) => l.id === loteSelecionadoId);
     const fotoFinal = fotoEtiquetaUrl || 'https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?w=500&auto=format&fit=crop&q=60';
+    const baseRastreio = codigoRastreio.trim() || `COD-${Date.now().toString().slice(-6)}`;
+    const agora = new Date().toLocaleString('pt-BR');
 
-    const novoItem: ItemEncomenda = {
-      id: `enc_${Date.now()}`,
-      loteId: loteSelecionadoId,
-      codigoRE: loteAtual?.codigoRE || 'REAVULSO',
-      condominioId: condominioAtivo.id,
-      unidade: unidadeFinal,
-      moradorId: moradorSelecionado?.id,
-      moradorNome: nomeDestinatario,
-      moradorWhatsapp: whatsDestinatario,
-      moradorCpf: moradorSelecionado?.cpf,
-      codigoRastreio: codigoRastreio || `COD-${Date.now().toString().slice(-6)}`,
-      fotoEtiquetaUrl: fotoFinal,
-      localArmazenamento: localArmazenamento,
-      observacoes: observacaoAvaria,
-      status: 'retido',
-      dataRecebimento: new Date().toLocaleString('pt-BR'),
-      operadorRecebimentoNome: operadorAtivo.nome
-    };
+    const totalVolumes = Math.max(1, qtdVolumesPacote);
+    for (let v = 1; v <= totalVolumes; v++) {
+      const volSuffix = totalVolumes > 1 ? ` (Volume ${v}/${totalVolumes})` : '';
+      const codRastreioVol = totalVolumes > 1 ? `${baseRastreio}-V${v}` : baseRastreio;
+      const obsFinal = observacaoAvaria
+        ? `${observacaoAvaria}${volSuffix}`
+        : (totalVolumes > 1 ? `Volume ${v} de ${totalVolumes}` : '');
 
-    onAddItemEncomenda(novoItem);
+      const novoItem: ItemEncomenda = {
+        id: `enc_${Date.now()}_${v}`,
+        loteId: loteSelecionadoId,
+        codigoRE: loteAtual?.codigoRE || 'REAVULSO',
+        condominioId: condominioAtivo.id,
+        unidade: unidadeFinal,
+        moradorId: moradorSelecionado?.id,
+        moradorNome: nomeDestinatario,
+        moradorWhatsapp: whatsDestinatario,
+        moradorCpf: moradorSelecionado?.cpf,
+        codigoRastreio: codRastreioVol,
+        fotoEtiquetaUrl: fotoFinal,
+        localArmazenamento: localArmazenamento,
+        observacoes: obsFinal,
+        status: 'retido',
+        dataRecebimento: agora,
+        operadorRecebimentoNome: operadorAtivo.nome
+      };
+
+      onAddItemEncomenda(novoItem);
+    }
     audioAlert.playSuccessBeep();
 
     // Disparo de notificação individual para o morador via WhatsApp com Local Armazenado
     const textoMorador = interpolateTemplate(DEFAULT_WHATSAPP_TEMPLATES.ENCOMENDA_DISPONIVEL, {
-      UNIDADE: novoItem.unidade,
-      MORADOR: novoItem.moradorNome,
+      UNIDADE: unidadeFinal,
+      MORADOR: nomeDestinatario,
       CONDOMINIO: condominioAtivo.nome,
       EMPRESA: loteAtual?.empresa || 'Transportadora',
-      LOTE_RE: novoItem.codigoRE,
+      LOTE_RE: loteAtual?.codigoRE || 'REAVULSO',
       LOCAL: localArmazenamento,
-      OBSERVACOES: observacaoAvaria || 'Em perfeito estado na portaria',
+      OBSERVACOES: (totalVolumes > 1 ? `📦 ${totalVolumes} volumes recebidos. ` : '') + (observacaoAvaria || 'Em perfeito estado na portaria'),
       OPERADOR: operadorAtivo.nome,
-      DATA_HORA: novoItem.dataRecebimento,
+      DATA_HORA: agora,
       LINK_FOTO: formatWhatsAppPhotoLink(fotoFinal)
     });
 
-    if (novoItem.moradorWhatsapp) {
-      const url = buildWhatsAppDeepLink(novoItem.moradorWhatsapp, textoMorador);
+    if (whatsDestinatario) {
+      const url = buildWhatsAppDeepLink(whatsDestinatario, textoMorador);
       window.open(url, '_blank');
     }
 
-    // Reset para o próximo pacote do lote
-    setMoradorSelecionado(null);
-    setModoMoradorAvulso(false);
-    setMoradorAvulsoNome('');
-    setMoradorAvulsoWhats('');
-    setUnidadeBusca('');
-    setCodigoRastreio('');
-    setObservacaoAvaria('');
-    setFotoEtiquetaUrl('');
-    setAlertaAgrupamento(null);
+    if (continuarMesmaUnidade) {
+      // Mantém unidade e morador selecionados para agilizar o próximo pacote da mesma entrega
+      setCodigoRastreio('');
+      setObservacaoAvaria('');
+      setFotoEtiquetaUrl('');
+      setQtdVolumesPacote(1);
+    } else {
+      // Reset completo para o próximo pacote do lote
+      setMoradorSelecionado(null);
+      setModoMoradorAvulso(false);
+      setMoradorAvulsoNome('');
+      setMoradorAvulsoWhats('');
+      setUnidadeBusca('');
+      setCodigoRastreio('');
+      setObservacaoAvaria('');
+      setFotoEtiquetaUrl('');
+      setAlertaAgrupamento(null);
+      setQtdVolumesPacote(1);
+    }
   };
 
   // 3ª ETAPA: Baixa de Encomendas Selecionadas
@@ -532,7 +553,7 @@ export const Mod02Encomendas: React.FC<Mod02EncomendasProps> = ({
   const loteAtivo = lotes.find((l) => l.id === loteSelecionadoId);
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 pb-20 sm:pb-4">
       {/* CABEÇALHO DO MÓDULO */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-900 p-4 rounded-2xl border border-slate-800">
         <div>
@@ -781,41 +802,91 @@ export const Mod02Encomendas: React.FC<Mod02EncomendasProps> = ({
                 </div>
               </div>
 
-              {/* SELEÇÃO DE BLOCO PRIMEIRO E DEPOIS UNIDADE */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-300 mb-1">
-                    {condominioAtivo.tipoEstrutura === 'Casas/Quadras' ? 'Quadra / Rua' : 'Bloco / Torre'}
+              {/* SELEÇÃO DE BLOCO E UNIDADE COM TECLADO NUMÉRICO E CHIPS RÁPIDOS */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
+                    <MapPin className="w-3.5 h-3.5 text-amber-400" />
+                    {condominioAtivo.tipoEstrutura === 'Casas/Quadras' ? 'Quadra / Rua e Unidade' : 'Bloco / Torre e Unidade'} *
                   </label>
-                  <select
-                    value={blocoFiltro}
-                    onChange={(e) => setBlocoFiltro(e.target.value)}
-                    className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-xs text-white font-bold focus:outline-none focus:border-amber-500"
-                  >
-                    <option value="todos">Todos os Blocos</option>
-                    {blocosCondominio.map((b) => (
-                      <option key={b} value={b}>{b}</option>
-                    ))}
-                  </select>
+                  {unidadeBusca && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setUnidadeBusca('');
+                        setMoradorSelecionado(null);
+                        setAlertaAgrupamento(null);
+                      }}
+                      className="text-[11px] text-amber-400 hover:text-amber-300 font-semibold cursor-pointer"
+                    >
+                      Limpar
+                    </button>
+                  )}
                 </div>
 
-                <div className="sm:col-span-2">
-                  <label className="block text-xs font-semibold text-slate-300 mb-1">
-                    Número da Unidade / Apto / Casa *
-                  </label>
+                {/* Chips de seleção rápida de Bloco para celular */}
+                {blocosCondominio.length > 0 && (
+                  <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-thin scrollbar-thumb-slate-700">
+                    <button
+                      type="button"
+                      onClick={() => setBlocoFiltro('todos')}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${
+                        blocoFiltro === 'todos'
+                          ? 'bg-amber-600 text-white shadow-sm'
+                          : 'bg-slate-800 text-slate-400 hover:text-white border border-slate-700'
+                      }`}
+                    >
+                      Todos os Blocos
+                    </button>
+                    {blocosCondominio.map((b) => (
+                      <button
+                        key={b}
+                        type="button"
+                        onClick={() => setBlocoFiltro(b)}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${
+                          blocoFiltro === b
+                            ? 'bg-amber-600 text-white shadow-sm'
+                            : 'bg-slate-800 text-slate-300 hover:text-white border border-slate-700'
+                        }`}
+                      >
+                        {b}
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {/* Campo Unidade com inputMode="numeric" para abrir o teclado numérico automaticamente no celular */}
+                <div className="relative">
                   <input
                     type="text"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
                     required
-                    placeholder="Digite número da unidade (ex: 102, 204, Casa 15)..."
+                    placeholder="Digite o número da unidade (ex: 102, 204)..."
                     value={unidadeBusca}
                     onChange={(e) => {
                       setUnidadeBusca(e.target.value);
                     }}
-                    className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-xs text-white focus:outline-none focus:border-amber-500 font-bold"
+                    className="w-full px-4 py-3 bg-slate-800 border-2 border-slate-700 focus:border-amber-500 rounded-xl text-base text-white focus:outline-none font-bold placeholder-slate-500 transition-colors shadow-inner"
                   />
-                  <span className="text-[10px] text-slate-500 mt-1 block">
-                    O número da unidade digitado aqui não será alterado ao escolher o morador.
-                  </span>
+                  {unidadeBusca && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setUnidadeBusca('');
+                        setMoradorSelecionado(null);
+                        setAlertaAgrupamento(null);
+                      }}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full bg-slate-700 text-slate-300 hover:text-white flex items-center justify-center text-xs"
+                      title="Limpar número"
+                    >
+                      ✕
+                    </button>
+                  )}
+                </div>
+                <div className="flex items-center justify-between text-[10px] text-slate-400">
+                  <span>O teclado numérico abre diretamente no celular.</span>
+                  <span className="text-amber-400 font-semibold">A unidade não é alterada ao escolher o morador</span>
                 </div>
               </div>
 
@@ -976,23 +1047,40 @@ export const Mod02Encomendas: React.FC<Mod02EncomendasProps> = ({
                 )}
               </div>
 
-              {/* LOCAL DE ARMAZENAMENTO EXIGIDO NA ESPECIFICAÇÃO */}
+              {/* LOCAL DE ARMAZENAMENTO COM CHIPS RÁPIDOS PARA CELULAR */}
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1 flex items-center gap-1.5">
-                  <MapPin className="w-3.5 h-3.5 text-amber-400" />
-                  Local Onde a Encomenda Foi Armazenada *
-                </label>
-                <select
-                  value={localArmazenamento}
-                  onChange={(e) => setLocalArmazenamento(e.target.value)}
-                  className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-xs text-white font-bold focus:outline-none focus:border-amber-500"
-                >
-                  {locaisDisponiveis.map((loc) => (
-                    <option key={loc} value={loc}>
-                      {loc}
-                    </option>
-                  ))}
-                </select>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
+                    <MapPin className="w-3.5 h-3.5 text-amber-400" />
+                    Local Onde a Encomenda Foi Guardada *
+                  </label>
+                  <span className="text-[11px] font-bold text-amber-400 bg-amber-950/60 px-2 py-0.5 rounded border border-amber-500/30 truncate max-w-[180px]">
+                    {localArmazenamento}
+                  </span>
+                </div>
+
+                {/* Chips de Acesso Rápido com 1 Toque */}
+                <div className="flex flex-wrap gap-1.5 mb-2">
+                  {locaisDisponiveis.map((loc) => {
+                    const isSel = localArmazenamento === loc;
+                    return (
+                      <button
+                        key={loc}
+                        type="button"
+                        onClick={() => setLocalArmazenamento(loc)}
+                        className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1 cursor-pointer ${
+                          isSel
+                            ? 'bg-amber-500 text-slate-950 font-black shadow-md shadow-amber-950/40'
+                            : 'bg-slate-800 text-slate-300 hover:text-white hover:bg-slate-750 border border-slate-700'
+                        }`}
+                      >
+                        <span>{loc}</span>
+                        {isSel && <span className="text-xs">✓</span>}
+                      </button>
+                    );
+                  })}
+                </div>
+
                 <div className="flex items-center justify-between text-[11px] text-slate-500 mt-1">
                   <span>Este local exato será informado na notificação do morador.</span>
                   <span className="text-[10px] text-emerald-400 font-mono">Gerenciável em Cadastros</span>
@@ -1040,13 +1128,57 @@ export const Mod02Encomendas: React.FC<Mod02EncomendasProps> = ({
                 />
               </div>
 
-              <button
-                type="submit"
-                disabled={!moradorSelecionado}
-                className="w-full py-3 bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-800 disabled:text-slate-500 text-white text-xs font-bold rounded-xl flex items-center justify-center gap-2 shadow-lg shadow-emerald-950/40 transition-all active:scale-95"
-              >
-                <CheckCircle2 className="w-4 h-4" /> Salvar Pacote & Enviar WhatsApp ao Morador
-              </button>
+              {/* QUANTIDADE DE VOLUMES / MULTI-PACOTES DA MESMA ENTREGA */}
+              <div className="bg-slate-850 p-3 rounded-xl border border-slate-750 flex items-center justify-between">
+                <div>
+                  <span className="text-xs font-bold text-white block">Volumes Desta Encomenda</span>
+                  <span className="text-[10px] text-slate-400">
+                    {qtdVolumesPacote > 1
+                      ? `${qtdVolumesPacote} pacotes serão gerados para a mesma unidade`
+                      : '1 volume padrão'}
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setQtdVolumesPacote(Math.max(1, qtdVolumesPacote - 1))}
+                    className="w-9 h-9 rounded-lg bg-slate-800 hover:bg-slate-700 text-white font-black text-sm flex items-center justify-center border border-slate-700 active:scale-95 transition-all"
+                  >
+                    -
+                  </button>
+                  <span className="w-8 text-center text-sm font-black text-amber-400 font-mono">
+                    {qtdVolumesPacote}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setQtdVolumesPacote(qtdVolumesPacote + 1)}
+                    className="w-9 h-9 rounded-lg bg-slate-800 hover:bg-slate-700 text-white font-black text-sm flex items-center justify-center border border-slate-700 active:scale-95 transition-all"
+                  >
+                    +
+                  </button>
+                </div>
+              </div>
+
+              {/* Botões de Ação na Triagem (Otimizado para Toque no Celular) */}
+              <div className="space-y-2 pt-1">
+                <button
+                  type="submit"
+                  disabled={!moradorSelecionado && !moradorAvulsoNome.trim()}
+                  className="w-full h-12 bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-800 disabled:text-slate-500 text-white text-xs sm:text-sm font-bold rounded-xl flex items-center justify-center gap-2 shadow-lg shadow-emerald-950/40 transition-all active:scale-95 cursor-pointer"
+                >
+                  <CheckCircle2 className="w-4 h-4" /> Salvar Pacote & Notificar Morador no WhatsApp
+                </button>
+
+                <button
+                  type="button"
+                  disabled={!moradorSelecionado && !moradorAvulsoNome.trim()}
+                  onClick={(e) => handleSalvarPacote(e, true)}
+                  className="w-full py-2.5 bg-slate-800 hover:bg-slate-750 disabled:bg-slate-800 disabled:opacity-40 text-amber-400 hover:text-amber-300 border border-amber-500/40 text-xs font-bold rounded-xl flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                >
+                  <Plus className="w-3.5 h-3.5" /> Salvar e Continuar Triando para Mesma Unidade
+                </button>
+              </div>
             </form>
           </div>
 
@@ -1137,18 +1269,66 @@ export const Mod02Encomendas: React.FC<Mod02EncomendasProps> = ({
             </span>
           </div>
 
-          {/* Busca por Unidade */}
-          <div className="relative">
-            <Search className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
-            <input
-              type="text"
-              inputMode="numeric"
-              pattern="[0-9]*"
-              placeholder="Digite a unidade para filtrar pacotes retidos (ex: 102)..."
-              value={baixaUnidadeBusca}
-              onChange={(e) => setBaixaUnidadeBusca(e.target.value)}
-              className="w-full pl-10 pr-4 py-2.5 bg-slate-800 border border-slate-700 rounded-xl text-xs text-white focus:outline-none focus:border-emerald-500 font-bold"
-            />
+          {/* Busca por Unidade OTIMIZADA PARA CELULAR COM TECLADO NUMÉRICO E SELEÇÃO EM LOTE */}
+          <div className="space-y-2">
+            <div className="relative">
+              <Search className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                placeholder="Digite a unidade para filtrar pacotes retidos (ex: 102)..."
+                value={baixaUnidadeBusca}
+                onChange={(e) => setBaixaUnidadeBusca(e.target.value)}
+                className="w-full pl-10 pr-10 py-3 bg-slate-800 border-2 border-slate-700 focus:border-emerald-500 rounded-xl text-sm sm:text-base text-white focus:outline-none font-bold"
+              />
+              {baixaUnidadeBusca && (
+                <button
+                  type="button"
+                  onClick={() => setBaixaUnidadeBusca('')}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full bg-slate-700 text-slate-300 hover:text-white flex items-center justify-center text-xs"
+                >
+                  ✕
+                </button>
+              )}
+            </div>
+
+            {/* Ação Rápida de Selecionar Todos da Unidade */}
+            {baixaUnidadeBusca.trim() && (
+              <div className="flex items-center justify-between p-2.5 bg-slate-850 rounded-xl border border-slate-750 text-xs">
+                <span className="text-slate-300">
+                  Pacotes para unidade <strong>{baixaUnidadeBusca}</strong>:{' '}
+                  <strong className="text-emerald-400">
+                    {itensRetidos.filter((i) => i.unidade.toLowerCase().includes(baixaUnidadeBusca.toLowerCase())).length}
+                  </strong>
+                </span>
+
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const correspondentes = itensRetidos
+                        .filter((i) => i.unidade.toLowerCase().includes(baixaUnidadeBusca.toLowerCase()))
+                        .map((i) => i.id);
+                      setItensSelecionadosParaBaixa(correspondentes);
+                    }}
+                    className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-bold transition-all active:scale-95"
+                  >
+                    ✓ Selecionar Todos
+                  </button>
+
+                  {itensSelecionadosParaBaixa.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setItensSelecionadosParaBaixa([])}
+                      className="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white rounded-lg text-xs"
+                    >
+                      Desmarcar
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Lista de Pacotes Disponíveis para Baixa */}
@@ -1250,7 +1430,9 @@ export const Mod02Encomendas: React.FC<Mod02EncomendasProps> = ({
                   </label>
                   <input
                     type="text"
-                    placeholder="Digite CPF ou Doc (ex: 123.456.789-00)..."
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    placeholder="Digite CPF ou Doc (apenas números)..."
                     value={retiranteDocumento}
                     onChange={(e) => setRetiranteDocumento(e.target.value)}
                     className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-xs text-white focus:outline-none focus:border-emerald-500 font-mono"
@@ -1619,6 +1801,7 @@ export const Mod02Encomendas: React.FC<Mod02EncomendasProps> = ({
                 </label>
                 <input
                   type="text"
+                  inputMode="numeric"
                   placeholder="Ex: 783.871.847-76"
                   value={entregadorDoc}
                   onChange={(e) => setEntregadorDoc(e.target.value)}
@@ -1886,6 +2069,77 @@ export const Mod02Encomendas: React.FC<Mod02EncomendasProps> = ({
           </div>
         </div>
       )}
+      {/* BARRA INFERIOR FIXA DE ACESSO RÁPIDO PARA CELULAR (ERGONOMIA DA PORTARIA) */}
+      <div className="sm:hidden fixed bottom-0 left-0 right-0 z-40 bg-slate-900/95 backdrop-blur-md border-t border-slate-800 px-3 py-2 flex items-center justify-around shadow-2xl safe-area-bottom">
+        <button
+          type="button"
+          onClick={() => setEtapa('triagem')}
+          className={`flex flex-col items-center gap-1 py-1 px-2.5 rounded-xl transition-all cursor-pointer ${
+            etapa === 'triagem'
+              ? 'text-amber-400 font-bold scale-105'
+              : 'text-slate-400 hover:text-slate-200'
+          }`}
+        >
+          <Package className="w-5 h-5" />
+          <span className="text-[10px]">Triagem</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setEtapa('baixa')}
+          className={`flex flex-col items-center gap-1 py-1 px-2.5 rounded-xl transition-all cursor-pointer relative ${
+            etapa === 'baixa'
+              ? 'text-emerald-400 font-bold scale-105'
+              : 'text-slate-400 hover:text-slate-200'
+          }`}
+        >
+          <div className="relative">
+            <CheckCircle2 className="w-5 h-5" />
+            {itensRetidos.length > 0 && (
+              <span className="absolute -top-1.5 -right-2.5 bg-amber-500 text-slate-950 font-black text-[9px] w-4 h-4 rounded-full flex items-center justify-center shadow">
+                {itensRetidos.length}
+              </span>
+            )}
+          </div>
+          <span className="text-[10px]">Baixa</span>
+        </button>
+
+        {/* BOTÃO CENTRAL DE SCANNER CÂMERA DO CELULAR */}
+        <button
+          type="button"
+          onClick={() => setModalCameraScanner(true)}
+          className="flex flex-col items-center -mt-5 bg-emerald-600 hover:bg-emerald-500 text-white p-3 rounded-full shadow-lg shadow-emerald-950/60 active:scale-95 transition-all cursor-pointer border-2 border-slate-900"
+          title="Abrir Scanner de Câmera Rápido"
+        >
+          <Camera className="w-5 h-5" />
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setEtapa('lotes')}
+          className={`flex flex-col items-center gap-1 py-1 px-2.5 rounded-xl transition-all cursor-pointer ${
+            etapa === 'lotes'
+              ? 'text-amber-400 font-bold scale-105'
+              : 'text-slate-400 hover:text-slate-200'
+          }`}
+        >
+          <Layers className="w-5 h-5" />
+          <span className="text-[10px]">Lotes</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setEtapa('historico_retiradas')}
+          className={`flex flex-col items-center gap-1 py-1 px-2.5 rounded-xl transition-all cursor-pointer ${
+            etapa === 'historico_retiradas'
+              ? 'text-amber-400 font-bold scale-105'
+              : 'text-slate-400 hover:text-slate-200'
+          }`}
+        >
+          <History className="w-5 h-5" />
+          <span className="text-[10px]">Retiradas</span>
+        </button>
+      </div>
     </div>
   );
 };

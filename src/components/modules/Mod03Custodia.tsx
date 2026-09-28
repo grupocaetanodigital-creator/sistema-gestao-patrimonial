@@ -594,6 +594,7 @@ export const Mod03Custodia: React.FC<Mod03CustodiaProps> = ({
                 </label>
                 <input
                   type="text"
+                  inputMode="numeric"
                   placeholder="Ex: 12.345.678-9"
                   value={retiranteDoc}
                   onChange={(e) => setRetiranteDoc(e.target.value)}
