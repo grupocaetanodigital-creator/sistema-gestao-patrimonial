@@ -68,6 +68,7 @@ export interface Morador {
   unidade: string; // Ex: "Bloco A - Apto 102"
   nomeCompleto: string;
   whatsapp: string;
+  cpf?: string; // CPF do morador para auditoria e conferência
   tipoVinculo: 'Proprietário' | 'Inquilino' | 'Dependente' | 'Autorizado';
 }
 
@@ -103,6 +104,7 @@ export interface ItemEncomenda {
   moradorId?: string;
   moradorNome: string;
   moradorWhatsapp: string;
+  moradorCpf?: string;
   codigoRastreio?: string;
   fotoEtiquetaUrl: string;
   observacoes?: string;
@@ -112,6 +114,7 @@ export interface ItemEncomenda {
   operadorRecebimentoNome: string;
   dataEntrega?: string;
   retiranteNome?: string;
+  retiranteDocumento?: string; // CPF ou RG de quem retirou na portaria para contestação
   fotoComprovanteUrl?: string;
   operadorEntregaNome?: string;
 }
@@ -373,7 +376,8 @@ export type CategoriaAtividade =
   | 'passagem'
   | 'autorizados'
   | 'cadastros'
-  | 'geral';
+  | 'geral'
+  | 'sistema';
 
 export type NivelAtividade = 'info' | 'sucesso' | 'aviso' | 'critico';
 

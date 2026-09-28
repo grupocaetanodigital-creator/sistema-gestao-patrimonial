@@ -4,6 +4,10 @@ import { mockDatabase } from '../data/mockDatabase';
 const STORAGE_SUPABASE_URL_KEY = 'infport_supabase_url';
 const STORAGE_SUPABASE_KEY_KEY = 'infport_supabase_anon_key';
 
+export const DEFAULT_SUPABASE_URL = 'https://stclhbchzwejatzphzil.supabase.co';
+export const DEFAULT_SUPABASE_ANON_KEY =
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN0Y2xoYmNoendlamF0enBoemlsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTAyNzA4ODgsImV4cCI6MjEwNTg0Njg4OH0.w5aeRfobWlQ7E2khVIwnA-vgep59JJvP2nPKxy4q3nA';
+
 export interface SupabaseConfig {
   url: string;
   anonKey: string;
@@ -17,8 +21,8 @@ export function getSupabaseConfig(): SupabaseConfig {
   const storedUrl = typeof window !== 'undefined' ? localStorage.getItem(STORAGE_SUPABASE_URL_KEY) || '' : '';
   const storedKey = typeof window !== 'undefined' ? localStorage.getItem(STORAGE_SUPABASE_KEY_KEY) || '' : '';
 
-  const url = (storedUrl || envUrl).trim();
-  const anonKey = (storedKey || envKey).trim();
+  const url = (storedUrl || envUrl || DEFAULT_SUPABASE_URL).trim();
+  const anonKey = (storedKey || envKey || DEFAULT_SUPABASE_ANON_KEY).trim();
 
   return {
     url,
@@ -1132,6 +1136,272 @@ export async function pushAtividadeToSupabase(a: any): Promise<void> {
     }
   } catch (err) {
     console.warn('Exceção ao enviar atividade para Supabase:', err);
+  }
+}
+
+/**
+ * Envia uma ocorrência imediatamente para o Supabase
+ */
+export async function pushOcorrenciaToSupabase(oco: any): Promise<void> {
+  const client = getSupabaseClient();
+  if (!client || !oco || !oco.condominioId) return;
+
+  try {
+    const { error } = await client.from('ocorrencias').upsert(
+      {
+        id: oco.id,
+        codigo: oco.codigo,
+        condominio_id: oco.condominioId,
+        tipo: oco.tipo,
+        categoria: oco.categoria,
+        severidade: oco.severidade || 'Média',
+        unidade_infratora: oco.unidadeInfratora || null,
+        unidade_reclamante: oco.unidadeReclamante || null,
+        descricao: oco.descricao,
+        foto_url: oco.fotoUrl || null,
+        audio_url: oco.audioUrl || null,
+        data_hora: oco.dataHora,
+        operador_nome: oco.operadorNome,
+        providencias_tomadas: oco.providenciasTomadas || null,
+        status_ocorrencia: oco.statusOcorrencia || 'Pendente',
+        observacao_resolucao: oco.observacaoResolucao || null,
+        resolvido_por: oco.resolvidoPor || null,
+        data_resolucao: oco.dataResolucao || null
+      },
+      { onConflict: 'id' }
+    );
+    if (error) console.warn('Erro ao subir ocorrência no Supabase:', error.message);
+  } catch (err) {
+    console.warn('Exceção ao subir ocorrência no Supabase:', err);
+  }
+}
+
+/**
+ * Envia um item de encomenda imediatamente para o Supabase
+ */
+export async function pushItemEncomendaToSupabase(item: any): Promise<void> {
+  const client = getSupabaseClient();
+  if (!client || !item || !item.condominioId) return;
+
+  try {
+    const { error } = await client.from('itens_encomenda').upsert(
+      {
+        id: item.id,
+        lote_id: item.loteId || null,
+        codigo_re: item.codigoRE,
+        condominio_id: item.condominioId,
+        unidade: item.unidade,
+        morador_id: item.moradorId || null,
+        morador_nome: item.moradorNome,
+        morador_whatsapp: item.moradorWhatsapp || null,
+        codigo_rastreio: item.codigoRastreio || null,
+        foto_etiqueta_url: item.fotoEtiquetaUrl || null,
+        observacoes: item.observacoes || null,
+        local_armazenamento: item.localArmazenamento || null,
+        status: item.status || 'retido',
+        data_recebimento: item.dataRecebimento,
+        operador_recebimento_nome: item.operadorRecebimentoNome,
+        data_entrega: item.dataEntrega || null,
+        retirante_nome: item.retiranteNome || null,
+        foto_comprovante_url: item.fotoComprovanteUrl || null,
+        operador_entrega_nome: item.operadorEntregaNome || null
+      },
+      { onConflict: 'id' }
+    );
+    if (error) console.warn('Erro ao subir item de encomenda no Supabase:', error.message);
+  } catch (err) {
+    console.warn('Exceção ao subir item de encomenda no Supabase:', err);
+  }
+}
+
+/**
+ * Envia um lote de encomendas imediatamente para o Supabase
+ */
+export async function pushLoteEncomendaToSupabase(lote: any): Promise<void> {
+  const client = getSupabaseClient();
+  if (!client || !lote || !lote.condominioId) return;
+
+  try {
+    const { error } = await client.from('lotes_encomenda').upsert(
+      {
+        id: lote.id,
+        codigo_re: lote.codigoRE,
+        condominio_id: lote.condominioId,
+        entregador_id: lote.entregadorId || null,
+        entregador_nome: lote.entregadorNome,
+        empresa: lote.empresa,
+        quantidade_declarada: lote.quantidadeDeclarada,
+        quantidade_triada: lote.quantidadeTriada,
+        operador_id: lote.operadorId || null,
+        operador_nome: lote.operadorNome,
+        data_hora: lote.dataHora,
+        status: lote.status
+      },
+      { onConflict: 'id' }
+    );
+    if (error) console.warn('Erro ao subir lote no Supabase:', error.message);
+  } catch (err) {
+    console.warn('Exceção ao subir lote no Supabase:', err);
+  }
+}
+
+/**
+ * Envia uma chave imediatamente para o Supabase
+ */
+export async function pushChaveToSupabase(chave: any): Promise<void> {
+  const client = getSupabaseClient();
+  if (!client || !chave || !chave.condominioId) return;
+
+  try {
+    const { error } = await client.from('chaves').upsert(
+      {
+        id: chave.id,
+        codigo: chave.codigo,
+        etiqueta_claviculario: chave.etiquetaClaviculario,
+        condominio_id: chave.condominioId,
+        nome: chave.nome,
+        categoria: chave.categoria,
+        local_correspondente: chave.localCorrespondente,
+        status: chave.status,
+        tempo_maximo_horas: chave.tempoMaximoHoras || null,
+        solicitante_nome: chave.solicitanteNome || null,
+        solicitante_tipo: chave.solicitanteTipo || null,
+        solicitante_detalhe: chave.solicitanteDetalhe || null,
+        solicitante_documento_foto_url: chave.solicitanteDocumentoFotoUrl || null,
+        motivo_retirada: chave.motivoRetirada || null,
+        data_hora_retirada: chave.dataHoraRetirada || null,
+        previsao_devolucao: chave.previsaoDevolucao || null,
+        operador_retirada_nome: chave.operadorRetiradaNome || null,
+        observacao_avaria_devolucao: chave.observacaoAvariaDevolucao || null,
+        foto_avaria_devolucao_url: chave.fotoAvariaDevolucaoUrl || null
+      },
+      { onConflict: 'id' }
+    );
+    if (error) console.warn('Erro ao subir chave no Supabase:', error.message);
+  } catch (err) {
+    console.warn('Exceção ao subir chave no Supabase:', err);
+  }
+}
+
+/**
+ * Envia um chamado de manutenção imediatamente para o Supabase
+ */
+export async function pushChamadoToSupabase(chamado: any): Promise<void> {
+  const client = getSupabaseClient();
+  if (!client || !chamado || !chamado.condominioId) return;
+
+  try {
+    const { error } = await client.from('chamados_manutencao').upsert(
+      {
+        id: chamado.id,
+        codigo_os: chamado.codigoOS,
+        condominio_id: chamado.condominioId,
+        titulo: chamado.titulo,
+        categoria: chamado.categoria,
+        prioridade: chamado.prioridade,
+        localizacao: chamado.localizacao,
+        descricao: chamado.descricao,
+        foto_antes_url: chamado.fotoAntesUrl || null,
+        status: chamado.status,
+        operador_abertura_nome: chamado.operadorAberturaNome,
+        data_abertura: chamado.dataAbertura,
+        solucao_descricao: chamado.solucaoDescricao || null,
+        foto_depois_url: chamado.fotoDepoisUrl || null,
+        data_conclusao: chamado.dataConclusao || null
+      },
+      { onConflict: 'id' }
+    );
+    if (error) console.warn('Erro ao subir chamado no Supabase:', error.message);
+  } catch (err) {
+    console.warn('Exceção ao subir chamado no Supabase:', err);
+  }
+}
+
+/**
+ * Envia uma passagem de posto imediatamente para o Supabase
+ */
+export async function pushPassagemToSupabase(pass: any): Promise<void> {
+  const client = getSupabaseClient();
+  if (!client || !pass || !pass.condominioId) return;
+
+  try {
+    const { error } = await client.from('passagens_posto').upsert(
+      {
+        id: pass.id,
+        codigo: pass.codigo,
+        condominio_id: pass.condominioId,
+        turno_nome: pass.turnoNome,
+        data_hora_passagem: pass.dataHoraPassagem,
+        operador_sainte_id: pass.operadorSainteId,
+        operador_sainte_nome: pass.operadorSainteNome,
+        operador_entrante_id: pass.operadorEntranteId || null,
+        operador_entrante_nome: pass.operadorEntranteNome || null,
+        resumo_chaves_fora: pass.resumoChavesFora || 0,
+        resumo_ocorrencias_abertas: pass.resumoOcorrenciasAbertas || 0,
+        resumo_encomendas_retidas: pass.resumoEncomendasRetidas || 0,
+        resumo_custodia_pendentes: pass.resumoCustodiaPendentes || 0,
+        resumo_rondas_feitas: pass.resumoRondasFeitas || 0,
+        resumo_materiais_com_defeito: pass.resumoMateriaisComDefeito || 0,
+        resumo_autorizados_no_condominio: pass.resumoAutorizadosNoCondominio || 0,
+        resumo_lotes_pendentes_triagem: pass.resumoLotesPendentesTriagem || 0,
+        resumo_encomendas_faltam_triar: pass.resumoEncomendasFaltamTriar || 0,
+        recados_turno: pass.recadosTurno || null,
+        divergencias: pass.divergencias || null,
+        assinatura_sainte_confirmada: pass.assinaturaSainteConfirmada ?? true,
+        assinatura_entrante_confirmada: pass.assinaturaEntranteConfirmada ?? true
+      },
+      { onConflict: 'id' }
+    );
+    if (error) console.warn('Erro ao subir passagem no Supabase:', error.message);
+  } catch (err) {
+    console.warn('Exceção ao subir passagem no Supabase:', err);
+  }
+}
+
+/**
+ * Assina atualizações em tempo real (Supabase Realtime) para as tabelas públicas principais.
+ * Retorna uma função de cancelamento para limpar no unmount.
+ */
+export function subscribeToRealtimeChanges(onRefresh: () => void): () => void {
+  const client = getSupabaseClient();
+  if (!client) return () => {};
+
+  try {
+    const channel = client
+      .channel('app_realtime_sync')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'historico_atividades' }, () => {
+        onRefresh();
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'itens_encomenda' }, () => {
+        onRefresh();
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'lotes_encomenda' }, () => {
+        onRefresh();
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'ocorrencias' }, () => {
+        onRefresh();
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'chaves' }, () => {
+        onRefresh();
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'chamados_manutencao' }, () => {
+        onRefresh();
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'passagens_posto' }, () => {
+        onRefresh();
+      })
+      .subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+          console.log('✓ Conectado ao Supabase Realtime com sucesso');
+        }
+      });
+
+    return () => {
+      client.removeChannel(channel);
+    };
+  } catch (err) {
+    console.warn('Falha ao inicializar Supabase Realtime channel:', err);
+    return () => {};
   }
 }
 

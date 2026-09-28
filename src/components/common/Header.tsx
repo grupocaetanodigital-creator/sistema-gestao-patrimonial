@@ -7,6 +7,8 @@ interface HeaderProps {
   condominioAtivo: Condominio;
   operadorAtivo: Operador;
   podeTrocarCondominio?: boolean;
+  syncStatus?: 'conectado' | 'sincronizando' | 'offline';
+  onForcarSincronizacao?: () => void;
   onTrocarCondominio: () => void;
   onLogout: () => void;
   onAbrirEmergencia: () => void;
@@ -17,6 +19,8 @@ export const Header: React.FC<HeaderProps> = ({
   condominioAtivo,
   operadorAtivo,
   podeTrocarCondominio = true,
+  syncStatus = 'conectado',
+  onForcarSincronizacao,
   onTrocarCondominio,
   onLogout,
   onAbrirEmergencia,
@@ -36,6 +40,16 @@ export const Header: React.FC<HeaderProps> = ({
               <span className="text-[10px] uppercase font-bold bg-emerald-500/20 text-emerald-400 px-1.5 py-0.2 rounded border border-emerald-500/30">
                 1.0
               </span>
+              {/* Indicador de Banco de Dados Supabase em Tempo Real */}
+              <button
+                type="button"
+                onClick={onForcarSincronizacao}
+                className="hidden xs:inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full border transition-all active:scale-95 cursor-pointer bg-emerald-950/40 border-emerald-500/40 text-emerald-300 hover:bg-emerald-900/60"
+                title="Banco de Dados Supabase ativo em Tempo Real (Clique para sincronizar agora)"
+              >
+                <span className={`w-1.5 h-1.5 rounded-full ${syncStatus === 'conectado' ? 'bg-emerald-400 animate-pulse' : syncStatus === 'sincronizando' ? 'bg-blue-400 animate-ping' : 'bg-amber-400'}`} />
+                <span className="font-semibold">{syncStatus === 'conectado' ? 'Tempo Real' : syncStatus === 'sincronizando' ? 'Sincronizando' : 'Nuvem'}</span>
+              </button>
             </div>
             {/* Posto Ativo */}
             {podeTrocarCondominio ? (

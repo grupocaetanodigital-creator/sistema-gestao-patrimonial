@@ -26,7 +26,17 @@ import {
   History
 } from 'lucide-react';
 import { audioAlert } from './lib/audioAlert';
-import { pushAtividadeToSupabase } from './lib/supabase';
+import {
+  pushAtividadeToSupabase,
+  pushOcorrenciaToSupabase,
+  pushItemEncomendaToSupabase,
+  pushLoteEncomendaToSupabase,
+  pushChaveToSupabase,
+  pushChamadoToSupabase,
+  pushPassagemToSupabase,
+  syncSupabaseToLocal,
+  subscribeToRealtimeChanges
+} from './lib/supabase';
 import {
   Condominio,
   Operador,
@@ -125,6 +135,9 @@ export default function App() {
   const [postosDisponiveisLogin, setPostosDisponiveisLogin] = useState<Condominio[]>([]);
   const [postoSelecionadoId, setPostoSelecionadoId] = useState<string>('');
   const [modalSelecaoPostoAberto, setModalSelecaoPostoAberto] = useState(false);
+
+  // Status de Sincronização em Tempo Real com Supabase Cloud (PostgreSQL)
+  const [supabaseSyncStatus, setSupabaseSyncStatus] = useState<'conectado' | 'sincronizando' | 'offline'>('sincronizando');
 
   // Consulta Feature Flags (Módulos 02 a 10) e RBAC do operador ativo
   useEffect(() => {
@@ -269,6 +282,65 @@ export default function App() {
     }
   };
 
+  const handleForcarSync = async () => {
+    try {
+      setSupabaseSyncStatus('sincronizando');
+      await syncSupabaseToLocal();
+      handleRefreshAllData();
+      setSupabaseSyncStatus('conectado');
+    } catch {
+      setSupabaseSyncStatus('offline');
+    }
+  };
+
+  // SINCRONIZAÇÃO AUTOMÁTICA COM SUPABASE CLOUD & TEMPO REAL (REALTIME)
+  // Garante que o aplicativo em qualquer celular, computador ou tablet mantenha dados 100% idênticos
+  useEffect(() => {
+    let unsubscribe = () => {};
+
+    const carregarBancoDeDados = async () => {
+      try {
+        setSupabaseSyncStatus('sincronizando');
+        await syncSupabaseToLocal();
+        handleRefreshAllData();
+        setSupabaseSyncStatus('conectado');
+      } catch (err) {
+        console.warn('Conexão inicial com Supabase (offline/contingência):', err);
+        setSupabaseSyncStatus('offline');
+      }
+    };
+
+    // 1. Carga inicial em qualquer dispositivo (Celular ou PC)
+    carregarBancoDeDados();
+
+    // 2. Escuta de atualizações em tempo real (Supabase Realtime)
+    unsubscribe = subscribeToRealtimeChanges(() => {
+      syncSupabaseToLocal().then(() => handleRefreshAllData()).catch(() => {});
+    });
+
+    // 3. Sincroniza ao retornar o foco à aba (ex: desbloquear celular)
+    const onFocus = () => {
+      carregarBancoDeDados();
+    };
+    window.addEventListener('focus', onFocus);
+
+    // 4. Polling periódico a cada 15 segundos para contingência de rede móvel
+    const pollInterval = setInterval(() => {
+      syncSupabaseToLocal()
+        .then(() => {
+          handleRefreshAllData();
+          setSupabaseSyncStatus('conectado');
+        })
+        .catch(() => {});
+    }, 15000);
+
+    return () => {
+      unsubscribe();
+      window.removeEventListener('focus', onFocus);
+      clearInterval(pollInterval);
+    };
+  }, []);
+
   const handleLogout = () => {
     if (operadorAtivo) {
       handleAddAtividade({
@@ -407,6 +479,7 @@ export default function App() {
     const updated = [lote, ...lotes];
     setLotes(updated);
     mockDb.saveLotes(updated);
+    pushLoteEncomendaToSupabase(lote).catch(() => {});
 
     handleAddAtividade({
       condominioId: lote.condominioId,
@@ -424,6 +497,7 @@ export default function App() {
     const updatedItens = [item, ...itensEncomenda];
     setItensEncomenda(updatedItens);
     mockDb.saveItensEncomenda(updatedItens);
+    pushItemEncomendaToSupabase(item).catch(() => {});
 
     const updatedLotes = lotes.map((l) =>
       l.id === item.loteId ? { ...l, quantidadeTriada: l.quantidadeTriada + 1 } : l
@@ -443,21 +517,30 @@ export default function App() {
     });
   };
 
-  const handleBaixaItensEncomenda = (ids: string[], retiranteNome: string, fotoUrl: string) => {
+  const handleBaixaItensEncomenda = (
+    ids: string[],
+    retiranteNome: string,
+    fotoUrl: string,
+    retiranteDocumento?: string
+  ) => {
     const agora = new Date().toLocaleString('pt-BR');
     const itensEntregues = itensEncomenda.filter((i) => ids.includes(i.id));
-    const updated = itensEncomenda.map((i) =>
-      ids.includes(i.id)
-        ? {
-            ...i,
-            status: 'entregue' as const,
-            retiranteNome,
-            fotoComprovanteUrl: fotoUrl,
-            dataEntrega: agora,
-            operadorEntregaNome: operadorAtivo?.nome
-          }
-        : i
-    );
+    const updated = itensEncomenda.map((i) => {
+      if (ids.includes(i.id)) {
+        const itemBaixado = {
+          ...i,
+          status: 'entregue' as const,
+          retiranteNome,
+          retiranteDocumento: retiranteDocumento || i.retiranteDocumento,
+          fotoComprovanteUrl: fotoUrl,
+          dataEntrega: agora,
+          operadorEntregaNome: operadorAtivo?.nome
+        };
+        pushItemEncomendaToSupabase(itemBaixado).catch(() => {});
+        return itemBaixado;
+      }
+      return i;
+    });
     setItensEncomenda(updated);
     mockDb.saveItensEncomenda(updated);
 
@@ -469,8 +552,8 @@ export default function App() {
       categoria: 'encomendas',
       moduloOrigem: 'Módulo 02: Encomendas & Triagem',
       acao: `Baixa / Entrega de Encomenda (${itensEntregues.length} volume(s))`,
-      descricao: `Entregue para "${retiranteNome}" referente à(s) unidade(s) ${unidades}.`,
-      detalhes: `Código(s) RE: ${reCodigos}. Foto do comprovante registrada.${fotoUrl ? ' (Com foto anexada)' : ''}`,
+      descricao: `Entregue para "${retiranteNome}"${retiranteDocumento ? ` (Doc/CPF: ${retiranteDocumento})` : ''} referente à(s) unidade(s) ${unidades}.`,
+      detalhes: `Código(s) RE: ${reCodigos}.${retiranteDocumento ? ` Documento Retirante: ${retiranteDocumento}.` : ''} Foto do comprovante registrada.${fotoUrl ? ' (Com foto anexada)' : ''}`,
       operadorNome: operadorAtivo?.nome || 'Porteiro',
       nivel: 'sucesso'
     });
@@ -597,6 +680,7 @@ export default function App() {
     const updated = [...chaves, chave];
     setChaves(updated);
     mockDb.saveChaves(updated);
+    pushChaveToSupabase(chave).catch(() => {});
 
     handleAddAtividade({
       condominioId: chave.condominioId,
@@ -615,6 +699,8 @@ export default function App() {
     const updated = chaves.map((c) => (c.id === id ? { ...c, ...dados } : c));
     setChaves(updated);
     mockDb.saveChaves(updated);
+    const chaveAtualizada = updated.find((c) => c.id === id);
+    if (chaveAtualizada) pushChaveToSupabase(chaveAtualizada).catch(() => {});
 
     handleAddAtividade({
       condominioId: chave?.condominioId || condominioAtivo.id,
@@ -649,6 +735,8 @@ export default function App() {
     );
     setChaves(updated);
     mockDb.saveChaves(updated);
+    const chaveAtualizada = updated.find((c) => c.id === id);
+    if (chaveAtualizada) pushChaveToSupabase(chaveAtualizada).catch(() => {});
 
     handleAddAtividade({
       condominioId: chave?.condominioId || condominioAtivo.id,
@@ -667,6 +755,7 @@ export default function App() {
     const updated = [chamado, ...chamados];
     setChamados(updated);
     mockDb.saveChamados(updated);
+    pushChamadoToSupabase(chamado).catch(() => {});
 
     handleAddAtividade({
       condominioId: chamado.condominioId,
@@ -695,6 +784,8 @@ export default function App() {
     );
     setChamados(updated);
     mockDb.saveChamados(updated);
+    const chamadoAtualizado = updated.find((c) => c.id === id);
+    if (chamadoAtualizado) pushChamadoToSupabase(chamadoAtualizado).catch(() => {});
 
     handleAddAtividade({
       condominioId: chamado?.condominioId || condominioAtivo.id,
@@ -762,6 +853,7 @@ export default function App() {
     const updated = [oco, ...ocorrencias];
     setOcorrencias(updated);
     mockDb.saveOcorrencias(updated);
+    pushOcorrenciaToSupabase(oco).catch(() => {});
 
     handleAddAtividade({
       condominioId: oco.condominioId,
@@ -780,6 +872,7 @@ export default function App() {
     const updated = ocorrencias.map((o) => (o.id === oco.id ? oco : o));
     setOcorrencias(updated);
     mockDb.saveOcorrencias(updated);
+    pushOcorrenciaToSupabase(oco).catch(() => {});
 
     const mudouStatus = anterior && anterior.statusOcorrencia !== oco.statusOcorrencia;
     const acaoTexto = mudouStatus
@@ -805,6 +898,7 @@ export default function App() {
     const updated = [pass, ...passagens];
     setPassagens(updated);
     mockDb.savePassagens(updated);
+    pushPassagemToSupabase(pass).catch(() => {});
 
     handleAddAtividade({
       condominioId: pass.condominioId,
@@ -1246,6 +1340,8 @@ export default function App() {
         condominioAtivo={condominioAtivo}
         operadorAtivo={operadorAtivo}
         podeTrocarCondominio={postosAutorizadosOperador.length > 1}
+        syncStatus={supabaseSyncStatus}
+        onForcarSincronizacao={handleForcarSync}
         onTrocarCondominio={() => setModalTrocaCondominioAberto(true)}
         onLogout={handleLogout}
         onAbrirEmergencia={() => setModalEmergenciaAberto(true)}
@@ -1440,6 +1536,9 @@ export default function App() {
             operadorAtivo={operadorAtivo}
             operadores={operadores}
             atividades={atividades}
+            itensEncomenda={itensEncomenda}
+            syncStatus={supabaseSyncStatus}
+            onForcarSincronizacao={handleForcarSync}
             onAddAtividade={handleAddAtividade}
           />
         )}

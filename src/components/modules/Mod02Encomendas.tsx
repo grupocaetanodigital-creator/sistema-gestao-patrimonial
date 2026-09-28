@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   Package,
   Plus,
@@ -16,7 +16,14 @@ import {
   User,
   Users,
   Eye,
-  ImageIcon
+  ImageIcon,
+  History,
+  Download,
+  Printer,
+  FileCheck,
+  ShieldCheck,
+  Calendar,
+  X
 } from 'lucide-react';
 import {
   Condominio,
@@ -46,7 +53,7 @@ interface Mod02EncomendasProps {
   itensEncomenda: ItemEncomenda[];
   onAddLote: (lote: LoteEncomenda) => void;
   onAddItemEncomenda: (item: ItemEncomenda) => void;
-  onBaixaItens: (ids: string[], retiranteNome: string, fotoUrl: string) => void;
+  onBaixaItens: (ids: string[], retiranteNome: string, fotoUrl: string, retiranteDocumento?: string) => void;
   onAddEntregador: (entregador: Entregador) => void;
 }
 
@@ -62,7 +69,11 @@ export const Mod02Encomendas: React.FC<Mod02EncomendasProps> = ({
   onBaixaItens,
   onAddEntregador
 }) => {
-  const [etapa, setEtapa] = useState<'lotes' | 'triagem' | 'baixa'>('triagem');
+  const [etapa, setEtapa] = useState<'lotes' | 'triagem' | 'baixa' | 'historico_retiradas'>('triagem');
+  const [buscaHistoricoRetiradas, setBuscaHistoricoRetiradas] = useState('');
+  const [filtroPeriodoRetiradas, setFiltroPeriodoRetiradas] = useState<'todos' | 'hoje' | '7dias' | '30dias'>('todos');
+  const [apenasComFotoRetirada, setApenasComFotoRetirada] = useState(false);
+  const [itemContestacaoModal, setItemContestacaoModal] = useState<ItemEncomenda | null>(null);
 
   // Modais de Foto e Scanner
   const [fotoModalOpen, setFotoModalOpen] = useState(false);
@@ -120,6 +131,7 @@ export const Mod02Encomendas: React.FC<Mod02EncomendasProps> = ({
   const [baixaUnidadeBusca, setBaixaUnidadeBusca] = useState('');
   const [itensSelecionadosParaBaixa, setItensSelecionadosParaBaixa] = useState<string[]>([]);
   const [retiranteNome, setRetiranteNome] = useState('');
+  const [retiranteDocumento, setRetiranteDocumento] = useState('');
   const [fotoComprovanteUrl, setFotoComprovanteUrl] = useState('');
   const [fotoVisualizarUrl, setFotoVisualizarUrl] = useState<string | null>(null);
   const [fotoVisualizarTitulo, setFotoVisualizarTitulo] = useState<string>('');
@@ -128,6 +140,126 @@ export const Mod02Encomendas: React.FC<Mod02EncomendasProps> = ({
   const itensRetidos = itensEncomenda.filter(
     (i) => i.condominioId === condominioAtivo.id && i.status === 'retido'
   );
+
+  // Itens entregues / histórico de retiradas para auditoria e contestação
+  const todosItensEntreguesCondominio = useMemo(() => {
+    return itensEncomenda.filter(
+      (i) => i.condominioId === condominioAtivo.id && i.status === 'entregue'
+    );
+  }, [itensEncomenda, condominioAtivo.id]);
+
+  const itensEntreguesFiltrados = useMemo(() => {
+    return todosItensEntreguesCondominio
+      .filter((item) => {
+        // Filtro por foto de comprovação
+        if (apenasComFotoRetirada && !item.fotoComprovanteUrl) {
+          return false;
+        }
+
+        // Filtro por período
+        if (filtroPeriodoRetiradas !== 'todos') {
+          const dtStr = item.dataEntrega || '';
+          const match = dtStr.match(/(\d{2})\/(\d{2})\/(\d{4})/);
+          if (match) {
+            const [, d, m, a] = match;
+            const dtEntrega = new Date(Number(a), Number(m) - 1, Number(d));
+            const agora = new Date();
+            agora.setHours(0, 0, 0, 0);
+
+            if (filtroPeriodoRetiradas === 'hoje') {
+              if (dtEntrega.getTime() !== agora.getTime()) return false;
+            } else if (filtroPeriodoRetiradas === '7dias') {
+              const limite7 = new Date();
+              limite7.setDate(limite7.getDate() - 7);
+              limite7.setHours(0, 0, 0, 0);
+              if (dtEntrega < limite7) return false;
+            } else if (filtroPeriodoRetiradas === '30dias') {
+              const limite30 = new Date();
+              limite30.setDate(limite30.getDate() - 30);
+              limite30.setHours(0, 0, 0, 0);
+              if (dtEntrega < limite30) return false;
+            }
+          }
+        }
+
+        // Filtro por busca textual (CPF, Rastreio, Unidade, Morador, Retirante, Lote RE)
+        if (buscaHistoricoRetiradas.trim()) {
+          const q = buscaHistoricoRetiradas.toLowerCase().trim();
+          const matchUnidade = item.unidade.toLowerCase().includes(q);
+          const matchMorador = (item.moradorNome || '').toLowerCase().includes(q);
+          const matchRetirante = (item.retiranteNome || '').toLowerCase().includes(q);
+          const matchDoc = (item.retiranteDocumento || '').toLowerCase().includes(q);
+          const matchRastreio = (item.codigoRastreio || '').toLowerCase().includes(q);
+          const matchRE = (item.codigoRE || '').toLowerCase().includes(q);
+          const matchDataEntrega = (item.dataEntrega || '').toLowerCase().includes(q);
+          const matchDataRecebimento = (item.dataRecebimento || '').toLowerCase().includes(q);
+          const matchOp = (item.operadorEntregaNome || '').toLowerCase().includes(q);
+
+          return (
+            matchUnidade ||
+            matchMorador ||
+            matchRetirante ||
+            matchDoc ||
+            matchRastreio ||
+            matchRE ||
+            matchDataEntrega ||
+            matchDataRecebimento ||
+            matchOp
+          );
+        }
+        return true;
+      })
+      .sort((a, b) => {
+        return (b.dataEntrega || '').localeCompare(a.dataEntrega || '');
+      });
+  }, [todosItensEntreguesCondominio, filtroPeriodoRetiradas, buscaHistoricoRetiradas, apenasComFotoRetirada]);
+
+  const handleExportarRetiradasCsv = () => {
+    if (itensEntreguesFiltrados.length === 0) return;
+    const header = [
+      'Condomínio',
+      'Unidade',
+      'Morador Destinatário',
+      'Código RE',
+      'Código de Rastreio',
+      'Local Armazenado',
+      'Data Recebimento',
+      'Operador Recebimento',
+      'Data/Hora Entrega',
+      'Nome do Retirante',
+      'Documento/CPF Retirante',
+      'Operador da Entrega',
+      'Possui Foto Comprovante'
+    ];
+    const rows = itensEntreguesFiltrados.map((i) => [
+      condominioAtivo.nome,
+      i.unidade,
+      i.moradorNome || '',
+      i.codigoRE,
+      i.codigoRastreio || '',
+      i.localArmazenamento || '',
+      i.dataRecebimento,
+      i.operadorRecebimentoNome,
+      i.dataEntrega || '',
+      i.retiranteNome || '',
+      i.retiranteDocumento || '',
+      i.operadorEntregaNome || '',
+      i.fotoComprovanteUrl ? 'SIM' : 'NÃO'
+    ]);
+    const csvContent =
+      'data:text/csv;charset=utf-8,\uFEFF' +
+      [header.join(';'), ...rows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(';'))].join('\n');
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement('a');
+    link.setAttribute('href', encodedUri);
+    link.setAttribute(
+      'download',
+      `encomendas_retiradas_${condominioAtivo.codigo}_${new Date().toISOString().slice(0, 10)}.csv`
+    );
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
 
   const lotesDoCondominio = lotes.filter((l) => l.condominioId === condominioAtivo.id);
 
@@ -378,7 +510,7 @@ export const Mod02Encomendas: React.FC<Mod02EncomendasProps> = ({
       </div>
 
       {/* SELETOR DE ETAPAS */}
-      <div className="grid grid-cols-3 gap-2 bg-slate-900 p-1.5 rounded-xl border border-slate-800">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-2 bg-slate-900 p-1.5 rounded-xl border border-slate-800">
         <button
           onClick={() => setEtapa('lotes')}
           className={`py-2 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
@@ -413,6 +545,18 @@ export const Mod02Encomendas: React.FC<Mod02EncomendasProps> = ({
         >
           <CheckCircle2 className="w-4 h-4" />
           <span>Saída / Baixa ({itensRetidos.length})</span>
+        </button>
+
+        <button
+          onClick={() => setEtapa('historico_retiradas')}
+          className={`py-2 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
+            etapa === 'historico_retiradas'
+              ? 'bg-amber-600 text-white shadow-md'
+              : 'text-slate-400 hover:text-slate-200'
+          }`}
+        >
+          <History className="w-4 h-4" />
+          <span>Retiradas / Contestação ({todosItensEntreguesCondominio.length})</span>
         </button>
       </div>
 
@@ -930,7 +1074,7 @@ export const Mod02Encomendas: React.FC<Mod02EncomendasProps> = ({
                 </div>
               )}
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
                   <label className="block text-xs font-semibold text-slate-300 mb-1">
                     Nome de Quem Está Retirando *
@@ -942,6 +1086,19 @@ export const Mod02Encomendas: React.FC<Mod02EncomendasProps> = ({
                     value={retiranteNome}
                     onChange={(e) => setRetiranteNome(e.target.value)}
                     className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-xs text-white focus:outline-none focus:border-emerald-500 font-bold"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1">
+                    CPF ou RG do Retirante <span className="text-slate-500 font-normal">(Opcional / Contestação)</span>
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Digite CPF ou Doc (ex: 123.456.789-00)..."
+                    value={retiranteDocumento}
+                    onChange={(e) => setRetiranteDocumento(e.target.value)}
+                    className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-xs text-white focus:outline-none focus:border-emerald-500 font-mono"
                   />
                 </div>
 
@@ -971,6 +1128,264 @@ export const Mod02Encomendas: React.FC<Mod02EncomendasProps> = ({
               >
                 <CheckCircle2 className="w-4 h-4" /> Confirmar Baixa & Disparo de Notificação Cruzada
               </button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ---------------- 4ª ETAPA: HISTÓRICO DE RETIRADAS & CONTESTAÇÃO DE ENCOMENDAS ---------------- */}
+      {etapa === 'historico_retiradas' && (
+        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 sm:p-5 space-y-4 shadow-xl">
+          {/* Header da Aba de Histórico de Retiradas */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-800">
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-black uppercase tracking-wider text-emerald-400 bg-emerald-950/60 px-2 py-0.5 rounded border border-emerald-500/30 flex items-center gap-1.5">
+                  <ShieldCheck className="w-3.5 h-3.5" /> AUDITORIA DE RETIRADAS & CONTESTAÇÃO
+                </span>
+                <span className="text-xs text-slate-400 font-mono">
+                  Posto: <strong className="text-white">{condominioAtivo.nome}</strong>
+                </span>
+              </div>
+              <h2 className="text-base sm:text-lg font-black text-white mt-1">
+                Histórico de Encomendas Entregues ({todosItensEntreguesCondominio.length} Registros)
+              </h2>
+              <p className="text-xs text-slate-400">
+                Consulta instantânea de pacotes retirados com foto de comprovação, CPF/Documento do retirante e emissão de termo para contestações.
+              </p>
+            </div>
+
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                type="button"
+                onClick={handleExportarRetiradasCsv}
+                disabled={itensEntreguesFiltrados.length === 0}
+                className="px-3 py-2 bg-slate-800 hover:bg-slate-750 text-emerald-400 hover:text-white border border-emerald-500/40 text-xs font-bold rounded-xl flex items-center gap-1.5 transition-all shadow active:scale-95 disabled:opacity-50 cursor-pointer"
+                title="Exportar dados para planilha Excel / CSV"
+              >
+                <Download className="w-3.5 h-3.5" /> Exportar CSV
+              </button>
+            </div>
+          </div>
+
+          {/* ESTATÍSTICAS RÁPIDAS DE RETIRADA */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+            <div className="bg-slate-850 p-3 rounded-xl border border-slate-750">
+              <span className="text-[10px] text-slate-400 font-semibold uppercase block">Total Entregues</span>
+              <p className="text-lg font-black text-white mt-0.5">{todosItensEntreguesCondominio.length}</p>
+              <span className="text-[10px] text-slate-500">Histórico no posto</span>
+            </div>
+            <div className="bg-slate-850 p-3 rounded-xl border border-slate-750">
+              <span className="text-[10px] text-emerald-400 font-semibold uppercase block">Entregues Hoje</span>
+              <p className="text-lg font-black text-emerald-400 mt-0.5">
+                {todosItensEntreguesCondominio.filter((i) => (i.dataEntrega || '').includes(new Date().toLocaleDateString('pt-BR'))).length}
+              </p>
+              <span className="text-[10px] text-slate-500">Baixas do dia</span>
+            </div>
+            <div className="bg-slate-850 p-3 rounded-xl border border-slate-750">
+              <span className="text-[10px] text-blue-400 font-semibold uppercase block">Com Foto / Comprovante</span>
+              <p className="text-lg font-black text-blue-400 mt-0.5">
+                {todosItensEntreguesCondominio.filter((i) => Boolean(i.fotoComprovanteUrl)).length}
+              </p>
+              <span className="text-[10px] text-slate-500">Comprovação registrada</span>
+            </div>
+            <div className="bg-slate-850 p-3 rounded-xl border border-slate-750">
+              <span className="text-[10px] text-amber-400 font-semibold uppercase block">Retidos na Guarita</span>
+              <p className="text-lg font-black text-amber-400 mt-0.5">{itensRetidos.length}</p>
+              <span className="text-[10px] text-slate-500">Aguardando retirada</span>
+            </div>
+          </div>
+
+          {/* BARRA DE FILTROS & BUSCA ESPECÍFICA PARA CONTESTAÇÕES */}
+          <div className="bg-slate-850 p-3 rounded-xl border border-slate-750 space-y-2.5">
+            <div className="flex flex-col md:flex-row gap-2">
+              <div className="relative flex-1">
+                <Search className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  placeholder="Buscar por CPF / Documento, Rastreio, Unidade, Destinatário, Lote RE ou Retirante..."
+                  value={buscaHistoricoRetiradas}
+                  onChange={(e) => setBuscaHistoricoRetiradas(e.target.value)}
+                  className="w-full pl-9 pr-8 py-2 bg-slate-900 border border-slate-700 rounded-xl text-xs text-white placeholder:text-slate-500 focus:outline-none focus:border-emerald-500"
+                />
+                {buscaHistoricoRetiradas && (
+                  <button
+                    type="button"
+                    onClick={() => setBuscaHistoricoRetiradas('')}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-slate-400 hover:text-white"
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
+
+              {/* Seletor de Período */}
+              <div className="flex items-center gap-1 bg-slate-900 p-1 rounded-xl border border-slate-700 shrink-0">
+                {(['todos', 'hoje', '7dias', '30dias'] as const).map((p) => (
+                  <button
+                    key={p}
+                    type="button"
+                    onClick={() => setFiltroPeriodoRetiradas(p)}
+                    className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all ${
+                      filtroPeriodoRetiradas === p
+                        ? 'bg-emerald-600 text-white shadow'
+                        : 'text-slate-400 hover:text-slate-200'
+                    }`}
+                  >
+                    {p === 'todos' ? 'Todos' : p === 'hoje' ? 'Hoje' : p === '7dias' ? '7 Dias' : '30 Dias'}
+                  </button>
+                ))}
+              </div>
+
+              {/* Toggle apenas com foto */}
+              <button
+                type="button"
+                onClick={() => setApenasComFotoRetirada(!apenasComFotoRetirada)}
+                className={`px-3 py-2 rounded-xl text-xs font-bold border transition-all flex items-center gap-1.5 shrink-0 ${
+                  apenasComFotoRetirada
+                    ? 'bg-emerald-950 border-emerald-500 text-emerald-300'
+                    : 'bg-slate-900 border-slate-700 text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                <Camera className="w-3.5 h-3.5" />
+                <span>Apenas c/ Foto</span>
+              </button>
+            </div>
+          </div>
+
+          {/* LISTA DE ENCOMENDAS ENTREGUES */}
+          {itensEntreguesFiltrados.length === 0 ? (
+            <div className="p-8 text-center bg-slate-850 rounded-xl border border-slate-800 space-y-2">
+              <Package className="w-8 h-8 text-slate-600 mx-auto" />
+              <p className="text-xs font-bold text-slate-300">Nenhuma encomenda entregue encontrada com estes filtros.</p>
+              <p className="text-[11px] text-slate-500">
+                Tente ajustar a busca ou período. Todas as baixas realizadas no sistema aparecem aqui para conferência.
+              </p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+              {itensEntreguesFiltrados.map((item) => (
+                <div
+                  key={item.id}
+                  className="bg-slate-850 border border-slate-750 hover:border-emerald-500/50 rounded-xl p-3.5 space-y-3 transition-all shadow group"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-xs font-black text-white bg-slate-800 px-2 py-0.5 rounded border border-slate-700">
+                          {item.unidade}
+                        </span>
+                        <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-emerald-950 border border-emerald-500/40 text-emerald-400">
+                          ENTREGUE ✓
+                        </span>
+                      </div>
+                      <p className="text-xs font-bold text-slate-200 mt-1 truncate max-w-[200px]">
+                        {item.moradorNome || 'Destinatário'}
+                      </p>
+                    </div>
+
+                    <div className="flex items-center gap-1 shrink-0">
+                      {/* Miniatura da Foto da Etiqueta */}
+                      {item.fotoEtiquetaUrl && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setFotoVisualizarUrl(item.fotoEtiquetaUrl);
+                            setFotoVisualizarTitulo(`Etiqueta: ${item.unidade} - ${item.codigoRE}`);
+                          }}
+                          className="w-10 h-10 rounded-lg overflow-hidden border border-slate-700 hover:border-amber-400 bg-black shrink-0 relative group/pic"
+                          title="Ver Foto da Etiqueta"
+                        >
+                          <img src={item.fotoEtiquetaUrl} alt="Etiqueta" className="w-full h-full object-cover" />
+                          <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover/pic:opacity-100">
+                            <Eye className="w-3 h-3 text-white" />
+                          </div>
+                        </button>
+                      )}
+
+                      {/* Miniatura da Foto de Retirada */}
+                      {item.fotoComprovanteUrl && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setFotoVisualizarUrl(item.fotoComprovanteUrl!);
+                            setFotoVisualizarTitulo(`Comprovante de Retirada: ${item.retiranteNome}`);
+                          }}
+                          className="w-10 h-10 rounded-lg overflow-hidden border border-emerald-500/50 hover:border-emerald-400 bg-black shrink-0 relative group/pic"
+                          title="Ver Foto do Retirante / Pacote entregue"
+                        >
+                          <img src={item.fotoComprovanteUrl} alt="Retirante" className="w-full h-full object-cover" />
+                          <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover/pic:opacity-100">
+                            <Eye className="w-3 h-3 text-white" />
+                          </div>
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Informações de Rastreio e RE */}
+                  <div className="p-2 bg-slate-900 rounded-lg border border-slate-800 text-[11px] space-y-1 font-mono">
+                    <div className="flex items-center justify-between text-slate-400">
+                      <span>Rastreio:</span>
+                      <strong className="text-amber-300 select-all truncate max-w-[150px]">
+                        {item.codigoRastreio || 'Sem rastreio'}
+                      </strong>
+                    </div>
+                    <div className="flex items-center justify-between text-slate-400">
+                      <span>Lote RE:</span>
+                      <span className="text-slate-300">{item.codigoRE}</span>
+                    </div>
+                  </div>
+
+                  {/* Detalhes da Baixa / Retirada */}
+                  <div className="space-y-1 text-xs text-slate-300 pt-1 border-t border-slate-800">
+                    <div className="flex items-center justify-between text-[11px]">
+                      <span className="text-slate-400 flex items-center gap-1">
+                        <User className="w-3 h-3 text-emerald-400" /> Retirado por:
+                      </span>
+                      <strong className="text-white truncate max-w-[170px]">
+                        {item.retiranteNome || 'Morador'}
+                      </strong>
+                    </div>
+
+                    <div className="flex items-center justify-between text-[10px] text-slate-400">
+                      <span>Entregue em:</span>
+                      <strong className="text-emerald-400">{item.dataEntrega}</strong>
+                    </div>
+
+                    <div className="flex items-center justify-between text-[10px] text-slate-400">
+                      <span>Operador:</span>
+                      <span>{item.operadorEntregaNome || 'Portaria'}</span>
+                    </div>
+                  </div>
+
+                  {/* Botões de Contestação */}
+                  <div className="flex items-center gap-1.5 pt-2 border-t border-slate-800">
+                    <button
+                      type="button"
+                      onClick={() => setItemContestacaoModal(item)}
+                      className="flex-1 py-1.5 px-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-bold flex items-center justify-center gap-1 transition-all shadow active:scale-95 cursor-pointer"
+                    >
+                      <FileCheck className="w-3.5 h-3.5" /> Termo / Contestação
+                    </button>
+
+                    {item.moradorWhatsapp && (
+                      <a
+                        href={buildWhatsAppDeepLink(
+                          item.moradorWhatsapp,
+                          `📦 *COMPROVANTE DE ENTREGA DE ENCOMENDA*\nCondomínio: ${condominioAtivo.nome}\nUnidade: ${item.unidade} - ${item.moradorNome}\n\n• Rastreio: ${item.codigoRastreio || item.codigoRE}\n• Retirado por: ${item.retiranteNome}\n• Data/Hora da Entrega: ${item.dataEntrega}\n• Operador: ${item.operadorEntregaNome || operadorAtivo.nome}\n\nComprovante registrado no sistema de segurança da portaria.`
+                        )}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="p-1.5 bg-slate-800 hover:bg-slate-700 text-emerald-400 border border-slate-750 rounded-lg text-xs font-bold transition-all"
+                        title="Enviar comprovante direto para o WhatsApp do morador"
+                      >
+                        <MessageSquare className="w-4 h-4" />
+                      </a>
+                    )}
+                  </div>
+                </div>
+              ))}
             </div>
           )}
         </div>
@@ -1125,6 +1540,197 @@ export const Mod02Encomendas: React.FC<Mod02EncomendasProps> = ({
         photoUrl={fotoVisualizarUrl || ''}
         title={fotoVisualizarTitulo}
       />
+
+      {/* MODAL TERMO OFICIAL DE RETIRADA / COMPROVANTE PARA CONTESTAÇÃO */}
+      {itemContestacaoModal && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-3 overflow-y-auto">
+          <div className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-xl p-5 shadow-2xl animate-in fade-in zoom-in-95 space-y-4 my-8">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+              <div className="flex items-center gap-2">
+                <div className="p-2 bg-emerald-500/20 rounded-xl border border-emerald-500/30">
+                  <ShieldCheck className="w-5 h-5 text-emerald-400" />
+                </div>
+                <div>
+                  <h2 className="text-base font-bold text-white leading-tight">
+                    Termo de Retirada & Comprovante de Entrega
+                  </h2>
+                  <p className="text-xs text-slate-400">
+                    Registro auditado para segurança patrimonial e contestação
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setItemContestacaoModal(null)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-3 bg-slate-850 rounded-xl border border-slate-700 space-y-3 text-xs">
+              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-750 pb-2">
+                <div>
+                  <span className="text-[10px] text-slate-400 uppercase font-semibold">Condomínio</span>
+                  <p className="font-bold text-white text-sm">{condominioAtivo.nome} ({condominioAtivo.codigo})</p>
+                </div>
+                <div className="text-right">
+                  <span className="text-[10px] text-slate-400 uppercase font-semibold">Status Oficial</span>
+                  <span className="block px-2 py-0.5 rounded text-[11px] font-black uppercase tracking-wider bg-emerald-950/80 border border-emerald-500/50 text-emerald-300">
+                    ✓ ENTREGUE / BAIXADO
+                  </span>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <span className="text-[10px] text-slate-400 uppercase font-semibold">Destinatário Oficial</span>
+                  <p className="font-bold text-white text-sm">{itemContestacaoModal.moradorNome || 'Não especificado'}</p>
+                  <p className="text-slate-300 font-semibold">Unidade: {itemContestacaoModal.unidade}</p>
+                  {itemContestacaoModal.moradorWhatsapp && (
+                    <p className="text-slate-400 font-mono text-[11px]">WhatsApp: {itemContestacaoModal.moradorWhatsapp}</p>
+                  )}
+                </div>
+
+                <div className="space-y-1">
+                  <span className="text-[10px] text-slate-400 uppercase font-semibold">Códigos de Rastreio & Lote</span>
+                  <p className="font-mono text-amber-300 font-bold">{itemContestacaoModal.codigoRastreio || 'Sem rastreio'}</p>
+                  <p className="font-mono text-slate-300">Lote: {itemContestacaoModal.codigoRE}</p>
+                  <p className="text-slate-400">Local na Triagem: {itemContestacaoModal.localArmazenamento || 'Guarita'}</p>
+                </div>
+              </div>
+
+              <div className="p-3 bg-slate-900 rounded-xl border border-slate-800 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-bold text-slate-300 flex items-center gap-1.5">
+                    <User className="w-3.5 h-3.5 text-emerald-400" />
+                    Pessoa que Retirou na Portaria:
+                  </span>
+                  <span className="font-black text-emerald-400 text-sm">
+                    {itemContestacaoModal.retiranteNome || 'Assinatura / Baixa Portaria'}
+                  </span>
+                </div>
+
+                {itemContestacaoModal.retiranteDocumento && (
+                  <div className="flex items-center justify-between text-[11px] text-slate-300">
+                    <span className="text-slate-400">CPF / Documento:</span>
+                    <span className="font-mono font-bold text-white bg-slate-800 px-2 py-0.5 rounded">
+                      {itemContestacaoModal.retiranteDocumento}
+                    </span>
+                  </div>
+                )}
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-2 border-t border-slate-800 text-[11px]">
+                  <div>
+                    <span className="text-slate-400">Entrada na Guarita:</span>
+                    <p className="font-semibold text-slate-200">{itemContestacaoModal.dataRecebimento}</p>
+                    <p className="text-[10px] text-slate-400">Por: {itemContestacaoModal.operadorRecebimentoNome}</p>
+                  </div>
+                  <div>
+                    <span className="text-slate-400">Saída / Entrega Efetiva:</span>
+                    <p className="font-semibold text-emerald-400">{itemContestacaoModal.dataEntrega || 'Horário de registro'}</p>
+                    <p className="text-[10px] text-slate-400">Operador: {itemContestacaoModal.operadorEntregaNome || operadorAtivo.nome}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* FOTOS DE COMPROVAÇÃO AUDITADA */}
+              <div className="space-y-1.5 pt-1">
+                <span className="text-[10px] text-slate-400 uppercase font-semibold">
+                  Fotos Anexadas para Comprovação (Auditoria)
+                </span>
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="space-y-1">
+                    <span className="text-[10px] text-slate-400">Foto da Etiqueta:</span>
+                    {itemContestacaoModal.fotoEtiquetaUrl ? (
+                      <div
+                        onClick={() => {
+                          setFotoVisualizarUrl(itemContestacaoModal.fotoEtiquetaUrl);
+                          setFotoVisualizarTitulo(`Etiqueta - Unidade ${itemContestacaoModal.unidade}`);
+                        }}
+                        className="h-28 rounded-xl overflow-hidden border border-slate-700 bg-black cursor-pointer group relative"
+                      >
+                        <img
+                          src={itemContestacaoModal.fotoEtiquetaUrl}
+                          alt="Etiqueta"
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                        />
+                        <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                          <Eye className="w-5 h-5 text-white" />
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="h-28 rounded-xl border border-dashed border-slate-750 flex items-center justify-center text-slate-500 text-[11px]">
+                        Sem foto
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="space-y-1">
+                    <span className="text-[10px] text-slate-400">Foto do Comprovante / Retirante:</span>
+                    {itemContestacaoModal.fotoComprovanteUrl ? (
+                      <div
+                        onClick={() => {
+                          setFotoVisualizarUrl(itemContestacaoModal.fotoComprovanteUrl!);
+                          setFotoVisualizarTitulo(`Comprovante de Retirada - ${itemContestacaoModal.retiranteNome}`);
+                        }}
+                        className="h-28 rounded-xl overflow-hidden border border-emerald-500/40 bg-black cursor-pointer group relative"
+                      >
+                        <img
+                          src={itemContestacaoModal.fotoComprovanteUrl}
+                          alt="Comprovante"
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                        />
+                        <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                          <Eye className="w-5 h-5 text-white" />
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="h-28 rounded-xl border border-dashed border-slate-750 flex items-center justify-center text-slate-500 text-[11px]">
+                        Sem foto registrada na baixa
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* BOTÕES DE AÇÃO DO TERMO / CONTESTAÇÃO */}
+            <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-800">
+              <button
+                type="button"
+                onClick={() => window.print()}
+                className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold rounded-xl flex items-center gap-1.5 transition-all cursor-pointer"
+              >
+                <Printer className="w-4 h-4" /> Imprimir Termo
+              </button>
+
+              <div className="flex items-center gap-2">
+                {itemContestacaoModal.moradorWhatsapp && (
+                  <a
+                    href={buildWhatsAppDeepLink(
+                      itemContestacaoModal.moradorWhatsapp,
+                      `📋 *TERMO DE ENTREGA DE ENCOMENDA (COMPROVANTE)*\nCondomínio: ${condominioAtivo.nome}\nUnidade: ${itemContestacaoModal.unidade} - ${itemContestacaoModal.moradorNome}\n\n• Rastreio: ${itemContestacaoModal.codigoRastreio || itemContestacaoModal.codigoRE}\n• Retirado por: ${itemContestacaoModal.retiranteNome || 'Morador/Autorizado'}\n• Data/Hora da Entrega: ${itemContestacaoModal.dataEntrega}\n• Entregue pelo Operador: ${itemContestacaoModal.operadorEntregaNome || operadorAtivo.nome}\n\nRegistro formalizado e arquivado no sistema de portaria.`
+                    )}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-xl flex items-center gap-1.5 shadow-md shadow-emerald-950/40 transition-all"
+                  >
+                    <MessageSquare className="w-4 h-4" /> WhatsApp do Morador
+                  </a>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setItemContestacaoModal(null)}
+                  className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white text-xs font-bold rounded-xl cursor-pointer"
+                >
+                  Fechar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
