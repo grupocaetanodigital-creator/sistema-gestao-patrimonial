@@ -34,8 +34,9 @@ import {
   pushChaveToSupabase,
   pushChamadoToSupabase,
   pushPassagemToSupabase,
-  syncSupabaseToLocal,
-  subscribeToRealtimeChanges
+  pushCondominioToSupabase,
+  syncHistoricoFromSupabase,
+  subscribeToHistoricoRealtime
 } from './lib/supabase';
 import {
   Condominio,
@@ -285,59 +286,47 @@ export default function App() {
   const handleForcarSync = async () => {
     try {
       setSupabaseSyncStatus('sincronizando');
-      await syncSupabaseToLocal();
-      handleRefreshAllData();
+      const sincronizadas = await syncHistoricoFromSupabase();
+      if (sincronizadas && sincronizadas.length > 0) {
+        setAtividades(sincronizadas);
+      }
       setSupabaseSyncStatus('conectado');
     } catch {
       setSupabaseSyncStatus('offline');
     }
   };
 
-  // SINCRONIZAÇÃO AUTOMÁTICA COM SUPABASE CLOUD & TEMPO REAL (REALTIME)
-  // Garante que o aplicativo em qualquer celular, computador ou tablet mantenha dados 100% idênticos
+  // SINCRONIZAÇÃO EM TEMPO REAL EXCLUSIVA DO MÓDULO 12 (HISTÓRICO & AUDITORIA)
+  // Conforme solicitação do usuário: dados de cadastros, condomínios e módulos locais NÃO são sobrescritos
   useEffect(() => {
     let unsubscribe = () => {};
 
-    const carregarBancoDeDados = async () => {
-      try {
-        setSupabaseSyncStatus('sincronizando');
-        await syncSupabaseToLocal();
-        handleRefreshAllData();
+    // 1. Carga inicial apenas do histórico de atividades do Supabase
+    syncHistoricoFromSupabase()
+      .then((atividadesSincronizadas) => {
+        if (atividadesSincronizadas && atividadesSincronizadas.length > 0) {
+          setAtividades(atividadesSincronizadas);
+        }
         setSupabaseSyncStatus('conectado');
-      } catch (err) {
+      })
+      .catch((err) => {
         console.warn('Conexão inicial com Supabase (offline/contingência):', err);
         setSupabaseSyncStatus('offline');
-      }
-    };
+      });
 
-    // 1. Carga inicial em qualquer dispositivo (Celular ou PC)
-    carregarBancoDeDados();
-
-    // 2. Escuta de atualizações em tempo real (Supabase Realtime)
-    unsubscribe = subscribeToRealtimeChanges(() => {
-      syncSupabaseToLocal().then(() => handleRefreshAllData()).catch(() => {});
-    });
-
-    // 3. Sincroniza ao retornar o foco à aba (ex: desbloquear celular)
-    const onFocus = () => {
-      carregarBancoDeDados();
-    };
-    window.addEventListener('focus', onFocus);
-
-    // 4. Polling periódico a cada 15 segundos para contingência de rede móvel
-    const pollInterval = setInterval(() => {
-      syncSupabaseToLocal()
-        .then(() => {
-          handleRefreshAllData();
-          setSupabaseSyncStatus('conectado');
+    // 2. Escuta de atualizações em tempo real EXCLUSIVAMENTE para a tabela historico_atividades
+    unsubscribe = subscribeToHistoricoRealtime(() => {
+      syncHistoricoFromSupabase()
+        .then((atividadesSincronizadas) => {
+          if (atividadesSincronizadas && atividadesSincronizadas.length > 0) {
+            setAtividades(atividadesSincronizadas);
+          }
         })
         .catch(() => {});
-    }, 15000);
+    });
 
     return () => {
       unsubscribe();
-      window.removeEventListener('focus', onFocus);
-      clearInterval(pollInterval);
     };
   }, []);
 
@@ -365,6 +354,7 @@ export default function App() {
     const updated = [...condominios, cond];
     setCondominios(updated);
     mockDb.saveCondominios(updated);
+    pushCondominioToSupabase(cond).catch(() => {});
 
     handleAddAtividade({
       condominioId: cond.id,
@@ -385,6 +375,7 @@ export default function App() {
     if (condominioAtivo.id === cond.id) {
       setCondominioAtivo(cond);
     }
+    pushCondominioToSupabase(cond).catch(() => {});
 
     handleAddAtividade({
       condominioId: cond.id,

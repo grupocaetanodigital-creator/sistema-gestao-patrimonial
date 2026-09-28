@@ -110,6 +110,9 @@ export const Mod02Encomendas: React.FC<Mod02EncomendasProps> = ({
   const [blocoFiltro, setBlocoFiltro] = useState<string>('todos');
   const [unidadeBusca, setUnidadeBusca] = useState('');
   const [moradorSelecionado, setMoradorSelecionado] = useState<Morador | null>(null);
+  const [modoMoradorAvulso, setModoMoradorAvulso] = useState(false);
+  const [moradorAvulsoNome, setMoradorAvulsoNome] = useState('');
+  const [moradorAvulsoWhats, setMoradorAvulsoWhats] = useState('');
   const [localArmazenamento, setLocalArmazenamento] = useState<string>(locaisDisponiveis[0] || 'Bancada Principal da Portaria');
   const [codigoRastreio, setCodigoRastreio] = useState('');
   const [observacaoAvaria, setObservacaoAvaria] = useState('');
@@ -119,6 +122,26 @@ export const Mod02Encomendas: React.FC<Mod02EncomendasProps> = ({
     unidade: string;
     pacotes: ItemEncomenda[];
   } | null>(null);
+
+  // Moradores filtrados para exibição em lista na triagem (sem alterar o que foi digitado)
+  const moradoresDaUnidadeTriagem = useMemo(() => {
+    if (!unidadeBusca.trim() && blocoFiltro === 'todos') return [];
+    const qUnidade = unidadeBusca.trim().toLowerCase();
+
+    return moradores.filter((m) => {
+      if (m.condominioId !== condominioAtivo.id) return false;
+      if (blocoFiltro !== 'todos' && !m.unidade.toLowerCase().includes(blocoFiltro.toLowerCase())) {
+        return false;
+      }
+      if (qUnidade) {
+        return (
+          m.unidade.toLowerCase().includes(qUnidade) ||
+          m.nomeCompleto.toLowerCase().includes(qUnidade)
+        );
+      }
+      return true;
+    });
+  }, [moradores, condominioAtivo.id, blocoFiltro, unidadeBusca]);
 
   // Mantém local de armazenamento sincronizado se mudar condomínio
   React.useEffect(() => {
@@ -358,20 +381,22 @@ export const Mod02Encomendas: React.FC<Mod02EncomendasProps> = ({
   };
 
   // Seleção de Unidade / Morador na Triagem com Checagem de Agrupamento
+  // Importante: NÃO altera a unidadeBusca digitada pelo usuário! Apenas seleciona o morador destinatário.
   const handleSelecionarMorador = (m: Morador) => {
     setMoradorSelecionado(m);
-    setUnidadeBusca(m.unidade);
+    setModoMoradorAvulso(false);
 
-    // Checagem de agrupamento físico
+    // Checagem de agrupamento físico baseando-se no que foi digitado ou na unidade do morador
+    const unidadeComparacao = (unidadeBusca.trim() || m.unidade).toLowerCase();
     const pacotesAnteriores = itensRetidos.filter(
-      (item) => item.unidade.toLowerCase() === m.unidade.toLowerCase()
+      (item) => item.unidade.toLowerCase().includes(unidadeComparacao)
     );
 
     if (pacotesAnteriores.length > 0) {
       audioAlert.playGroupingAlert();
       setAlertaAgrupamento({
         count: pacotesAnteriores.length,
-        unidade: m.unidade,
+        unidade: unidadeBusca.trim() || m.unidade,
         pacotes: pacotesAnteriores
       });
       // Sugere automaticamente o mesmo local de armazenamento já utilizado
@@ -386,7 +411,26 @@ export const Mod02Encomendas: React.FC<Mod02EncomendasProps> = ({
   // 2ª ETAPA: Salvar Pacote Triado
   const handleSalvarPacote = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!moradorSelecionado || !loteSelecionadoId) return;
+    const nomeDestinatario = moradorSelecionado
+      ? moradorSelecionado.nomeCompleto
+      : moradorAvulsoNome.trim();
+
+    if (!nomeDestinatario || !loteSelecionadoId) return;
+
+    // Preserva rigorosamente a unidade digitada pelo operador sem sobrescrita
+    const uDigitada = unidadeBusca.trim();
+    let unidadeFinal = uDigitada;
+    if (uDigitada) {
+      if (blocoFiltro !== 'todos' && !uDigitada.toLowerCase().includes(blocoFiltro.toLowerCase())) {
+        unidadeFinal = `${blocoFiltro} — ${uDigitada}`;
+      }
+    } else {
+      unidadeFinal = moradorSelecionado?.unidade || 'Portaria';
+    }
+
+    const whatsDestinatario = moradorSelecionado
+      ? moradorSelecionado.whatsapp
+      : moradorAvulsoWhats.trim();
 
     const loteAtual = lotes.find((l) => l.id === loteSelecionadoId);
     const fotoFinal = fotoEtiquetaUrl || 'https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?w=500&auto=format&fit=crop&q=60';
@@ -396,10 +440,11 @@ export const Mod02Encomendas: React.FC<Mod02EncomendasProps> = ({
       loteId: loteSelecionadoId,
       codigoRE: loteAtual?.codigoRE || 'REAVULSO',
       condominioId: condominioAtivo.id,
-      unidade: moradorSelecionado.unidade,
-      moradorId: moradorSelecionado.id,
-      moradorNome: moradorSelecionado.nomeCompleto,
-      moradorWhatsapp: moradorSelecionado.whatsapp,
+      unidade: unidadeFinal,
+      moradorId: moradorSelecionado?.id,
+      moradorNome: nomeDestinatario,
+      moradorWhatsapp: whatsDestinatario,
+      moradorCpf: moradorSelecionado?.cpf,
       codigoRastreio: codigoRastreio || `COD-${Date.now().toString().slice(-6)}`,
       fotoEtiquetaUrl: fotoFinal,
       localArmazenamento: localArmazenamento,
@@ -433,6 +478,9 @@ export const Mod02Encomendas: React.FC<Mod02EncomendasProps> = ({
 
     // Reset para o próximo pacote do lote
     setMoradorSelecionado(null);
+    setModoMoradorAvulso(false);
+    setMoradorAvulsoNome('');
+    setMoradorAvulsoWhats('');
     setUnidadeBusca('');
     setCodigoRastreio('');
     setObservacaoAvaria('');
@@ -753,73 +801,180 @@ export const Mod02Encomendas: React.FC<Mod02EncomendasProps> = ({
 
                 <div className="sm:col-span-2">
                   <label className="block text-xs font-semibold text-slate-300 mb-1">
-                    Unidade Destinatária / Morador *
+                    Número da Unidade / Apto / Casa *
                   </label>
                   <input
                     type="text"
-                    inputMode="numeric"
-                    pattern="[0-9]*"
-                    placeholder="Digite número da unidade (ex: 102)..."
+                    required
+                    placeholder="Digite número da unidade (ex: 102, 204, Casa 15)..."
                     value={unidadeBusca}
                     onChange={(e) => {
                       setUnidadeBusca(e.target.value);
-                      setMoradorSelecionado(null);
                     }}
                     className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-xs text-white focus:outline-none focus:border-amber-500 font-bold"
                   />
+                  <span className="text-[10px] text-slate-500 mt-1 block">
+                    O número da unidade digitado aqui não será alterado ao escolher o morador.
+                  </span>
                 </div>
               </div>
 
-              {/* Sugestões Rápidas de Moradores da Unidade / Bloco */}
-              {unidadeBusca.length >= 1 && !moradorSelecionado && (
-                <div className="p-2 bg-slate-850 border border-slate-700 rounded-xl max-h-36 overflow-y-auto space-y-1">
-                  {moradores
-                    .filter(
-                      (m) =>
-                        m.condominioId === condominioAtivo.id &&
-                        (blocoFiltro === 'todos' || m.unidade.toLowerCase().includes(blocoFiltro.toLowerCase())) &&
-                        (m.unidade.toLowerCase().includes(unidadeBusca.toLowerCase()) ||
-                          m.nomeCompleto.toLowerCase().includes(unidadeBusca.toLowerCase()))
-                    )
-                    .map((morador) => (
-                      <button
-                        key={morador.id}
-                        type="button"
-                        onClick={() => handleSelecionarMorador(morador)}
-                        className="w-full p-2 text-left bg-slate-800 hover:bg-amber-950/50 hover:border-amber-500/50 border border-transparent rounded-lg flex items-center justify-between text-xs transition-colors"
-                      >
-                        <div>
-                          <span className="font-bold text-amber-400">{morador.unidade}</span>
-                          <span className="text-white ml-2">{morador.nomeCompleto}</span>
-                          <span className="text-slate-400 text-[10px] ml-2 font-mono">({morador.tipoVinculo})</span>
-                        </div>
-                        <span className="text-[10px] text-slate-400 font-mono">
-                          {morador.whatsapp}
-                        </span>
-                      </button>
-                    ))}
+              {/* SELEÇÃO DO MORADOR DESTINATÁRIO EM FORMATO DE LISTA */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="block text-xs font-bold text-slate-300 flex items-center gap-1.5">
+                    <Users className="w-3.5 h-3.5 text-amber-400" />
+                    Destinatário da Encomenda *
+                  </label>
+                  {unidadeBusca.trim() && (
+                    <span className="text-[11px] text-slate-400">
+                      Unidade informada: <strong className="text-white">{blocoFiltro !== 'todos' ? `${blocoFiltro} — ` : ''}{unidadeBusca}</strong>
+                    </span>
+                  )}
                 </div>
-              )}
 
-              {moradorSelecionado && (
-                <div className="p-2.5 bg-emerald-950/40 border border-emerald-500/40 rounded-xl flex items-center justify-between text-xs">
-                  <div>
-                    <p className="font-bold text-emerald-400">
-                      {moradorSelecionado.unidade} — {moradorSelecionado.nomeCompleto}
-                    </p>
-                    <p className="text-slate-400 font-mono text-[11px]">
-                      WhatsApp Destino: +55 {moradorSelecionado.whatsapp}
-                    </p>
+                {/* Se um morador cadastrado foi selecionado na lista */}
+                {moradorSelecionado && !modoMoradorAvulso && (
+                  <div className="p-3 bg-emerald-950/60 border border-emerald-500/50 rounded-xl flex items-center justify-between text-xs animate-in fade-in">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-7 h-7 rounded-full bg-emerald-800/80 border border-emerald-400/40 flex items-center justify-center text-white font-black text-xs shrink-0">
+                        ✓
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold text-white text-sm">
+                            {moradorSelecionado.nomeCompleto}
+                          </span>
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-900 border border-emerald-500/40 text-emerald-300 uppercase">
+                            {moradorSelecionado.tipoVinculo}
+                          </span>
+                        </div>
+                        <p className="text-slate-300 font-mono text-[11px] mt-0.5">
+                          WhatsApp: +55 {moradorSelecionado.whatsapp || 'Não informado'} | Cadastro: {moradorSelecionado.unidade}
+                        </p>
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => setMoradorSelecionado(null)}
+                      className="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded-lg text-xs font-semibold border border-slate-700 transition-all cursor-pointer"
+                    >
+                      Trocar da Lista
+                    </button>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => setMoradorSelecionado(null)}
-                    className="text-xs text-rose-400 hover:underline"
-                  >
-                    Alterar
-                  </button>
-                </div>
-              )}
+                )}
+
+                {/* Modo Morador Não Listado / Digitar Manualmente */}
+                {modoMoradorAvulso && (
+                  <div className="p-3 bg-slate-850 border border-amber-500/40 rounded-xl space-y-2.5 text-xs animate-in fade-in">
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-amber-400 text-xs">
+                        Digitar Nome do Destinatário (Morador Não Listado)
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setModoMoradorAvulso(false)}
+                        className="text-xs text-slate-400 hover:text-white underline cursor-pointer"
+                      >
+                        Voltar para lista de moradores
+                      </button>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      <div>
+                        <label className="block text-[11px] text-slate-300 mb-1">Nome Completo do Destinatário *</label>
+                        <input
+                          type="text"
+                          required
+                          placeholder="Digite o nome de quem receberá..."
+                          value={moradorAvulsoNome}
+                          onChange={(e) => setMoradorAvulsoNome(e.target.value)}
+                          className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-xs text-white focus:outline-none focus:border-amber-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[11px] text-slate-300 mb-1">WhatsApp para Notificação (Opcional)</label>
+                        <input
+                          type="tel"
+                          placeholder="Ex: 11988887777"
+                          value={moradorAvulsoWhats}
+                          onChange={(e) => setMoradorAvulsoWhats(e.target.value)}
+                          className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-xs text-white focus:outline-none focus:border-amber-500"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* LISTAGEM DE MORADORES NO FORMATO DE LISTA (SOLICITAÇÃO EXPLÍCITA) */}
+                {!moradorSelecionado && !modoMoradorAvulso && (
+                  <div className="space-y-1.5">
+                    {moradoresDaUnidadeTriagem.length > 0 ? (
+                      <div className="border border-slate-750 bg-slate-850 rounded-xl overflow-hidden divide-y divide-slate-800 max-h-52 overflow-y-auto">
+                        <div className="p-2.5 bg-slate-800/80 text-[11px] font-bold text-slate-400 uppercase tracking-wider flex items-center justify-between">
+                          <span>Moradores Encontrados ({moradoresDaUnidadeTriagem.length}):</span>
+                          <span className="text-amber-400 font-semibold">Clique para selecionar quem receberá</span>
+                        </div>
+                        {moradoresDaUnidadeTriagem.map((morador) => (
+                          <button
+                            key={morador.id}
+                            type="button"
+                            onClick={() => handleSelecionarMorador(morador)}
+                            className="w-full p-2.5 text-left hover:bg-amber-950/40 hover:border-amber-500/30 flex items-center justify-between text-xs transition-colors cursor-pointer group"
+                          >
+                            <div className="flex items-center gap-2.5">
+                              <div className="w-5 h-5 rounded-full border border-slate-600 group-hover:border-amber-400 flex items-center justify-center shrink-0">
+                                <div className="w-2.5 h-2.5 rounded-full group-hover:bg-amber-400 transition-colors" />
+                              </div>
+                              <div>
+                                <div className="flex items-center gap-2">
+                                  <span className="font-bold text-white group-hover:text-amber-300 text-xs">
+                                    {morador.nomeCompleto}
+                                  </span>
+                                  <span className="text-[10px] text-slate-400 font-mono px-1.5 py-0.2 rounded bg-slate-800 border border-slate-700">
+                                    {morador.tipoVinculo}
+                                  </span>
+                                </div>
+                                <span className="text-[11px] text-slate-400">
+                                  Unidade Cadastrada: <strong className="text-slate-300">{morador.unidade}</strong>
+                                </span>
+                              </div>
+                            </div>
+
+                            <span className="text-[11px] text-emerald-400 font-mono flex items-center gap-1 shrink-0">
+                              <MessageSquare className="w-3 h-3" />
+                              {morador.whatsapp ? `+55 ${morador.whatsapp}` : 'Sem WhatsApp'}
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                    ) : (
+                      unidadeBusca.trim() && (
+                        <div className="p-3 bg-slate-850/80 border border-slate-800 rounded-xl text-xs text-slate-400 flex items-center justify-between">
+                          <span>Nenhum morador pré-cadastrado encontrado para a busca "{unidadeBusca}".</span>
+                          <button
+                            type="button"
+                            onClick={() => setModoMoradorAvulso(true)}
+                            className="px-2.5 py-1 bg-amber-600 hover:bg-amber-500 text-white rounded-lg font-bold text-[11px] transition-all cursor-pointer"
+                          >
+                            + Digitar Nome Manualmente
+                          </button>
+                        </div>
+                      )
+                    )}
+
+                    <div className="flex items-center justify-end pt-0.5">
+                      <button
+                        type="button"
+                        onClick={() => setModoMoradorAvulso(true)}
+                        className="text-[11px] text-amber-400 hover:text-amber-300 underline font-semibold cursor-pointer"
+                      >
+                        + Destinatário não está na lista? Clique aqui para digitar o nome
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
 
               {/* LOCAL DE ARMAZENAMENTO EXIGIDO NA ESPECIFICAÇÃO */}
               <div>

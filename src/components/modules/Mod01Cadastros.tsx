@@ -169,43 +169,49 @@ export const Mod01Cadastros: React.FC<Mod01CadastrosProps> = ({
   // ---------- ESTADO DE BACKUP ----------
   const [condominioBackupId, setCondominioBackupId] = useState(condominioAtivo.id);
   const [backupStatusMsg, setBackupStatusMsg] = useState('');
+  const [condSalvoMsg, setCondSalvoMsg] = useState('');
+  const ativoCondIdRef = React.useRef(condominioAtivo.id);
 
-  // Sincronizar quando mudar o condomínio ativo
+  // Sincronizar APENAS quando mudar o ID do condomínio ativo (ex: alternar posto)
+  // Evita redefinir os campos enquanto o usuário está digitando ou salvando
   React.useEffect(() => {
-    setCondNome(condominioAtivo.nome);
-    setCondCnpj(condominioAtivo.cnpj);
-    setCondEndereco(condominioAtivo.endereco);
-    setCondTelPortaria(condominioAtivo.telefonePortaria);
-    setCondSindico(condominioAtivo.nomeSindico);
-    setCondTelSindico(condominioAtivo.telefoneSindico);
-    setCondInicioObras(condominioAtivo.horarioInicioObras);
-    setCondFimObras(condominioAtivo.horarioFimObras);
-    setCondIntervaloRonda(condominioAtivo.intervaloRondaMinutos);
-    setCondTipoEstrutura(condominioAtivo.tipoEstrutura || 'Blocos');
-    setCondQtdBlocos(condominioAtivo.quantidadeBlocos || 2);
-    setCondUnidadesPorBloco(condominioAtivo.unidadesPorBloco || 40);
-    setCondListaBlocos((condominioAtivo.listaBlocos || ['Bloco A', 'Bloco B']).join(', '));
-    setLocaisArmazenamento(
-      condominioAtivo.locaisArmazenamento || [
-        'Portaria - Prateleira A',
-        'Portaria - Prateleira B',
-        'Armário 01',
-        'Armário 02',
-        'Bancada Principal',
-        'Chão / Caixas Grandes'
-      ]
-    );
-    setTurnoDiurnoNome(condominioAtivo.turnos?.diurno.nome || 'Plantão Diurno');
-    setTurnoDiurnoInicio(condominioAtivo.turnos?.diurno.inicio || '07:00');
-    setTurnoDiurnoFim(condominioAtivo.turnos?.diurno.fim || '19:00');
-    setTurnoNoturnoNome(condominioAtivo.turnos?.noturno.nome || 'Plantão Noturno');
-    setTurnoNoturnoInicio(condominioAtivo.turnos?.noturno.inicio || '19:00');
-    setTurnoNoturnoFim(condominioAtivo.turnos?.noturno.fim || '07:00');
-    setFlags(condominioAtivo.featureFlags);
-    setCondominioBackupId(condominioAtivo.id);
-    setFiltroPostoOperador('ativo');
-    setBuscaOperador('');
-  }, [condominioAtivo]);
+    if (ativoCondIdRef.current !== condominioAtivo.id) {
+      ativoCondIdRef.current = condominioAtivo.id;
+      setCondNome(condominioAtivo.nome);
+      setCondCnpj(condominioAtivo.cnpj);
+      setCondEndereco(condominioAtivo.endereco);
+      setCondTelPortaria(condominioAtivo.telefonePortaria);
+      setCondSindico(condominioAtivo.nomeSindico);
+      setCondTelSindico(condominioAtivo.telefoneSindico);
+      setCondInicioObras(condominioAtivo.horarioInicioObras);
+      setCondFimObras(condominioAtivo.horarioFimObras);
+      setCondIntervaloRonda(condominioAtivo.intervaloRondaMinutos);
+      setCondTipoEstrutura(condominioAtivo.tipoEstrutura || 'Blocos');
+      setCondQtdBlocos(condominioAtivo.quantidadeBlocos || 2);
+      setCondUnidadesPorBloco(condominioAtivo.unidadesPorBloco || 40);
+      setCondListaBlocos((condominioAtivo.listaBlocos || ['Bloco A', 'Bloco B']).join(', '));
+      setLocaisArmazenamento(
+        condominioAtivo.locaisArmazenamento || [
+          'Portaria - Prateleira A',
+          'Portaria - Prateleira B',
+          'Armário 01',
+          'Armário 02',
+          'Bancada Principal',
+          'Chão / Caixas Grandes'
+        ]
+      );
+      setTurnoDiurnoNome(condominioAtivo.turnos?.diurno.nome || 'Plantão Diurno');
+      setTurnoDiurnoInicio(condominioAtivo.turnos?.diurno.inicio || '07:00');
+      setTurnoDiurnoFim(condominioAtivo.turnos?.diurno.fim || '19:00');
+      setTurnoNoturnoNome(condominioAtivo.turnos?.noturno.nome || 'Plantão Noturno');
+      setTurnoNoturnoInicio(condominioAtivo.turnos?.noturno.inicio || '19:00');
+      setTurnoNoturnoFim(condominioAtivo.turnos?.noturno.fim || '07:00');
+      setFlags(condominioAtivo.featureFlags);
+      setCondominioBackupId(condominioAtivo.id);
+      setFiltroPostoOperador('ativo');
+      setBuscaOperador('');
+    }
+  }, [condominioAtivo.id]);
 
   // Handlers para Locais de Armazenamento
   const handleAdicionarLocal = () => {
@@ -313,8 +319,12 @@ export const Mod01Cadastros: React.FC<Mod01CadastrosProps> = ({
     };
 
     onUpdateCondominio(atualizado);
+    setCondSalvoMsg('✓ Configurações do Condomínio salvas e sincronizadas com sucesso!');
     setFlagsSalvasMsg(true);
-    setTimeout(() => setFlagsSalvasMsg(false), 3000);
+    setTimeout(() => {
+      setFlagsSalvasMsg(false);
+      setCondSalvoMsg('');
+    }, 4000);
   };
 
   const handleToggleFlag = (key: keyof FeatureFlags) => {
@@ -786,10 +796,10 @@ export const Mod01Cadastros: React.FC<Mod01CadastrosProps> = ({
       </div>
 
       {/* FEEDBACK DE SALVAMENTO */}
-      {flagsSalvasMsg && (
-        <div className="p-3 bg-emerald-950/60 border border-emerald-500/40 rounded-xl text-xs text-emerald-300 flex items-center gap-2 animate-in fade-in">
+      {(flagsSalvasMsg || condSalvoMsg) && (
+        <div className="p-3 bg-emerald-950/80 border border-emerald-500/50 rounded-xl text-xs text-emerald-300 flex items-center gap-2 animate-in fade-in">
           <Check className="w-4 h-4 text-emerald-400" />
-          <span>Configurações salvas e aplicadas com sucesso no condomínio {condominioAtivo.nome}!</span>
+          <span>{condSalvoMsg || `Configurações salvas e aplicadas com sucesso no condomínio ${condominioAtivo.nome}!`}</span>
         </div>
       )}
 

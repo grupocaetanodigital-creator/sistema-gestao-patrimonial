@@ -1359,6 +1359,124 @@ export async function pushPassagemToSupabase(pass: any): Promise<void> {
 }
 
 /**
+ * Envia ou atualiza um condomínio no Supabase (quando editado ou criado)
+ */
+export async function pushCondominioToSupabase(cond: any): Promise<void> {
+  const client = getSupabaseClient();
+  if (!client || !cond || !cond.id) return;
+
+  try {
+    const { error } = await client.from('condominios').upsert(
+      {
+        id: cond.id,
+        codigo: cond.codigo,
+        nome: cond.nome,
+        cnpj: cond.cnpj || null,
+        endereco: cond.endereco || null,
+        telefone_portaria: cond.telefonePortaria || null,
+        nome_sindico: cond.nomeSindico || null,
+        telefone_sindico: cond.telefoneSindico || null,
+        horario_inicio_obras: cond.horarioInicioObras || null,
+        horario_fim_obras: cond.horarioFimObras || null,
+        intervalo_ronda_minutos: cond.intervaloRondaMinutos || 15,
+        tipo_estrutura: cond.tipoEstrutura || 'Blocos',
+        quantidade_blocos: cond.quantidadeBlocos || 2,
+        unidades_por_bloco: cond.unidadesPorBloco || 40,
+        lista_blocos: cond.listaBlocos || [],
+        locais_armazenamento: cond.locaisArmazenamento || [],
+        turnos: cond.turnos || {},
+        feature_flags: cond.featureFlags || {}
+      },
+      { onConflict: 'id' }
+    );
+    if (error) console.warn('Erro ao atualizar condomínio no Supabase:', error.message);
+  } catch (err) {
+    console.warn('Exceção ao subir condomínio no Supabase:', err);
+  }
+}
+
+/**
+ * Sincroniza EXCLUSIVAMENTE o Módulo 12 (Histórico de Atividades) com o Supabase.
+ * Conforme regra estrita: não sobrescreve condomínios, operadores ou configurações locais.
+ */
+export async function syncHistoricoFromSupabase(): Promise<any[]> {
+  const client = getSupabaseClient();
+  if (!client) return [];
+
+  try {
+    const { data, error } = await client
+      .from('historico_atividades')
+      .select('*')
+      .order('data_hora', { ascending: false });
+
+    if (error) {
+      console.warn('Erro ao baixar historico_atividades do Supabase:', error.message);
+      return [];
+    }
+
+    if (data && data.length > 0) {
+      const mapeados = data.map((a: any) => ({
+        id: a.id,
+        codigo: a.codigo,
+        condominioId: a.condominio_id,
+        categoria: a.categoria,
+        moduloOrigem: a.modulo_origem,
+        acao: a.acao,
+        descricao: a.descricao,
+        detalhes: a.detalhes,
+        operadorId: a.operador_id,
+        operadorNome: a.operador_nome,
+        dataHora: a.data_hora,
+        nivel: a.nivel
+      }));
+
+      // Mescla com as atividades existentes localmente por ID
+      const locais = mockDatabase.getAtividades();
+      const mapa = new Map<string, any>();
+      locais.forEach((item) => mapa.set(item.id, item));
+      mapeados.forEach((item) => mapa.set(item.id, item));
+
+      const combinadas = Array.from(mapa.values());
+      mockDatabase.saveAtividades(combinadas);
+      return combinadas;
+    }
+    return [];
+  } catch (err) {
+    console.warn('Exceção ao sincronizar histórico de atividades:', err);
+    return [];
+  }
+}
+
+/**
+ * Assina atualizações em tempo real EXCLUSIVAMENTE para a tabela de histórico de atividades.
+ * Evita disparidades entre dispositivos no Módulo 12 sem afetar os dados locais de outros módulos.
+ */
+export function subscribeToHistoricoRealtime(onNewAtividades: () => void): () => void {
+  const client = getSupabaseClient();
+  if (!client) return () => {};
+
+  try {
+    const channel = client
+      .channel('historico_atividades_realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'historico_atividades' }, () => {
+        onNewAtividades();
+      })
+      .subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+          console.log('✓ Canal Realtime do Módulo 12 (Histórico) conectado');
+        }
+      });
+
+    return () => {
+      client.removeChannel(channel);
+    };
+  } catch (err) {
+    console.warn('Falha ao assinar canal de histórico:', err);
+    return () => {};
+  }
+}
+
+/**
  * Assina atualizações em tempo real (Supabase Realtime) para as tabelas públicas principais.
  * Retorna uma função de cancelamento para limpar no unmount.
  */
